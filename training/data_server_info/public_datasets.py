@@ -274,13 +274,21 @@ db_info['ScanNet'] = {
     'test_annotations_path': 'ScanNet/ScanNet/annotations/test.json',
     'val_annotations_path': 'ScanNet/ScanNet/annotations/test.json',
 }
-# KITTI, RGBD dataset
+# # KITTI, RGBD dataset
+# db_info['KITTI'] = {
+#     'db_root': 'tbd_data_root',
+#     'data_root': '',
+#     'train_annotations_path': 'KITTI/KITTI/annotations/eigen_train.json',
+#     'test_annotations_path': 'KITTI/KITTI/annotations/eigen_test.json',
+#     'val_annotations_path': 'KITTI/KITTI/annotations/eigen_test.json',
+# }
+
 db_info['KITTI'] = {
-    'db_root': 'tbd_data_root',
+    'db_root': '',
     'data_root': '',
-    'train_annotations_path': 'KITTI/KITTI/annotations/eigen_train.json',
-    'test_annotations_path': 'KITTI/KITTI/annotations/eigen_test.json',
-    'val_annotations_path': 'KITTI/KITTI/annotations/eigen_test.json',
+    'train_annotations_path': '/root/autodl-tmp/metric3d/Metric3D/gt_depths/train_annotations.json',
+    'test_annotations_path': '/root/autodl-tmp/metric3d/Metric3D/gt_depths/test_annotations.json',
+    'val_annotations_path': '/root/autodl-tmp/metric3d/Metric3D/gt_depths/test_annotations.json',
 }
 
 

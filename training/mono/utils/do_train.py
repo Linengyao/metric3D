@@ -65,11 +65,26 @@ def do_train(local_rank: int, cfg: dict):
                                                    pin_memory=True,
                                                    generator=g,)
                                                 #    collate_fn=collate_fn)
+    # if isinstance(val_dataset, list):
+    #     val_dataloader = [torch.utils.data.DataLoader(dataset=val_dataset,
+    #                                                   batch_size=1,
+    #                                                   num_workers=0,
+    #                                                   sampler=torch.utils.data.distributed.DistributedSampler(val_dataset, shuffle=False),
+    #                                                   drop_last=True,
+    #                                                   pin_memory=True,) for val_group in val_dataset for val_dataset in val_group]
+    # else:
+    #     val_dataloader = torch.utils.data.DataLoader(dataset=val_dataset,
+    #                                             batch_size=1,
+    #                                             num_workers=0,
+    #                                             sampler=val_sampler,
+    #                                             drop_last=True,
+    #                                             pin_memory=True,)
+
     if isinstance(val_dataset, list):
         val_dataloader = [torch.utils.data.DataLoader(dataset=val_dataset,
                                                       batch_size=1,
                                                       num_workers=0,
-                                                      sampler=torch.utils.data.distributed.DistributedSampler(val_dataset, shuffle=False),
+                                                      sampler=None,
                                                       drop_last=True,
                                                       pin_memory=True,) for val_group in val_dataset for val_dataset in val_group]
     else:
@@ -79,7 +94,7 @@ def do_train(local_rank: int, cfg: dict):
                                                 sampler=val_sampler,
                                                 drop_last=True,
                                                 pin_memory=True,)
-    
+
     # build schedule
     lr_scheduler = build_lr_schedule_with_cfg(cfg)
     optimizer = build_optimizer_with_cfg(cfg, model)

@@ -129,15 +129,20 @@ def metric3d_vit_giant2(pretrain=False, **kwargs):
     model (nn.Module): a Metric3D model.
   '''
   cfg_file = MODEL_TYPE['ViT-giant2']['cfg_file']
-  ckpt_file = MODEL_TYPE['ViT-giant2']['ckpt_file']
+  # ckpt_file = MODEL_TYPE['ViT-giant2']['ckpt_file']
+  ckpt_file = '/root/autodl-tmp/metric3d/Metric3D/metric_depth_vit_giant2_800k.pth'# 修改为本地路径
 
   cfg = Config.fromfile(cfg_file)
   model = get_configured_monodepth_model(cfg)
+  # if pretrain:
+  #   model.load_state_dict(
+  #     torch.hub.load_state_dict_from_url(ckpt_file)['model_state_dict'], 
+  #     strict=False,
+  #   )
   if pretrain:
-    model.load_state_dict(
-      torch.hub.load_state_dict_from_url(ckpt_file)['model_state_dict'], 
-      strict=False,
-    )
+    state_dict = torch.load(ckpt_file)['model_state_dict']
+    model.load_state_dict(state_dict, strict=False)
+
   return model
 
 
