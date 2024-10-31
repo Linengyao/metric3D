@@ -14,8 +14,8 @@ KITTI_dataset=dict(
     data = dict(
     # configs for the training pipeline
     train=dict(
-        anno_path='KITTI/annotations/train.json',
-     #    anno_path='/root/autodl-tmp/metric3d/Metric3D/gt_depths/train_annotations.json',
+     #    anno_path='KITTI/annotations/train.json',
+        anno_path='/root/autodl-tmp/metric3d/Metric3D/gt_depths/train_annotations.json',
         sample_ratio = 1.0,
         sample_size = -1,
         pipeline=[dict(type='BGR2RGB'),
@@ -46,8 +46,8 @@ KITTI_dataset=dict(
 
     # configs for the training pipeline
     val=dict(
-        anno_path='KITTI/annotations/test.json',
-     #    anno_path='/root/autodl-tmp/metric3d/Metric3D/gt_depths/test_annotations.json',
+     #    anno_path='KITTI/annotations/test.json',
+        anno_path='/root/autodl-tmp/metric3d/Metric3D/gt_depths/test_annotations.json',
         pipeline=[dict(type='BGR2RGB'),
                   dict(type='ResizeCanonical', ratio_range=(1.0, 1.0)),
                   dict(type='RandomCrop', 
@@ -62,7 +62,8 @@ KITTI_dataset=dict(
         sample_size = 20,),
     # configs for the training pipeline
     test=dict(
-         anno_path='KITTI/annotations/test.json',
+     #     anno_path='KITTI/annotations/test.json',
+        anno_path='/root/autodl-tmp/metric3d/Metric3D/gt_depths/test_annotations.json',
         pipeline=[dict(type='BGR2RGB'),
                #   dict(type='LiDarResizeCanonical', ratio_range=(1.0, 1.0)),
                   dict(type='ResizeKeepRatio', 
