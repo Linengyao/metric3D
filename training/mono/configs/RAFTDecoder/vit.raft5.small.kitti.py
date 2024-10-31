@@ -1,11 +1,10 @@
 _base_=['../_base_/losses/all_losses.py',
        '../_base_/models/encoder_decoder/dino_vit_small_reg.dpt_raft.py',
 
-       '../_base_/datasets/nyu.py',
        '../_base_/datasets/kitti.py',
        '../_base_/datasets/_data_base_.py',
 
-       '../_base_/default_runtime.py'
+       '../_base_/default_runtime.py',
        ]
 
 import numpy as np
@@ -23,17 +22,18 @@ losses=dict(
     decoder_losses=[
         dict(type='VNLoss', sample_ratio=0.2, loss_weight=1.0),   
         dict(type='GRUSequenceLoss', loss_weight=0.5, loss_gamma=0.9, stereo_sup=0.0),     
-        dict(type='SkyRegularizationLoss', loss_weight=0.001, sample_ratio=0.4, regress_value=200, normal_regress=[0, 0, -1]),
+        # dict(type='SkyRegularizationLoss', loss_weight=0.001, sample_ratio=0.4, regress_value=200, normal_regress=[0, 0, -1]),
         dict(type='HDNRandomLoss', loss_weight=0.5, random_num=10),
         dict(type='HDSNRandomLoss', loss_weight=0.5, random_num=20, batch_limit=4),
         dict(type='PWNPlanesLoss', loss_weight=1),
-        dict(type='NormalBranchLoss', loss_weight=1.0, loss_fn='NLL_ours_GRU'),
+        # dict(type='NormalBranchLoss', loss_weight=1.0, loss_fn='NLL_ours_GRU'),
         dict(type='DeNoConsistencyLoss', loss_weight=0.01, loss_fn='CEL', scale=2, depth_detach=True)
     ],
     gru_losses=[
         dict(type='SkyRegularizationLoss', loss_weight=0.001, sample_ratio=0.4, regress_value=200, normal_regress=[0, 0, -1]),
     ],
 )
+
 
 data_array = [
 
@@ -66,7 +66,8 @@ log_interval = 100
 evaluation = dict(
     online_eval=False, 
     interval=interval, 
-    metrics=['abs_rel', 'delta1', 'rmse', 'normal_mean', 'normal_rmse', 'normal_a1'], 
+    # metrics=['abs_rel', 'delta1', 'rmse', 'normal_mean', 'normal_rmse', 'normal_a1'], 
+    metrics=['abs_rel', 'delta1', 'rmse'],
     multi_dataset_eval=True,
     exclude=['DIML_indoor', 'GL3D', 'Tourism', 'MegaDepth'],
 )
