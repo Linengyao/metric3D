@@ -3,3 +3,6 @@ show_dirs
 *__pycache__*
 test_dataloader_*
 *.onnx
+gt_depths
+metric_depth_vit_giant2_800k.pth
+metric_depth_vit_small_800k.pth
