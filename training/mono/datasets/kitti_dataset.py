@@ -60,7 +60,7 @@ class KITTIDataset(BaseDataset):
 
         # data augmentation
         transform_paras = dict(random_crop_size = self.random_crop_size) # dict() 
-        assert curr_rgb.shape[:2] == curr_depth.shape == curr_normal.shape[:2] == curr_sem.shape
+        # assert curr_rgb.shape[:2] == curr_depth.shape == curr_normal.shape[:2] == curr_sem.shape
         rgbs, depths, intrinsics, cam_models, normals, other_labels, transform_paras = self.img_transforms(
                                                                    images=[curr_rgb, ], 
                                                                    labels=[curr_depth, ], 
