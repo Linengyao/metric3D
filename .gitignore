@@ -10,4 +10,4 @@ metric_depth_vit_small_800k.pth
 output
 temp
 training/work_dirs
-convtiny_hourglass_v1.pth
+*.pth
