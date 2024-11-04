@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 from scipy.optimize import linear_sum_assignment
 from tqdm import tqdm
 from scipy.ndimage import zoom  # 导入缩放库
-
+from kf import DepthKalmanFilter  
 def load_images_and_depths(image_dir, depth_dir, camera_suffix):
     """
     加载图像和深度图
@@ -188,6 +188,39 @@ def plot_distances(distances, target_ids, output_dir, min_frames=50):
     output_path = os.path.join(output_dir, 'target_distances.png')
     plt.savefig(output_path, bbox_inches='tight')
     plt.close()
+
+def plot_distances_with_filter(distances, filter_distances, target_ids, output_dir, min_frames=50):
+    """
+    绘制目标距离随时间变化的曲线图并保存为图片文件
+    :param distances: 原始距离字典，键为目标ID，值为包含 (帧号, 距离值) 元组的列表
+    :param filter_distances: 滤波后的距离字典，键为目标ID，值为包含 (帧号, 距离值) 元组的列表
+    :param target_ids: 目标ID列表
+    :param output_dir: 输出目录
+    :param min_frames: 最小连续帧数
+    """
+    plt.figure(figsize=(10, 6))
+    for target_id in target_ids:
+        # 提取帧号和距离值，过滤掉None值
+        frame_indices = [frame for frame, distance in distances[target_id] if distance is not None]
+        target_distances = [distance for _, distance in distances[target_id] if distance is not None]
+        filter_frame_indices = [frame for frame, distance in filter_distances[target_id] if distance is not None]
+        filter_target_distances = [distance for _, distance in filter_distances[target_id] if distance is not None]
+
+        # 过滤掉连续帧数小于min_frames的目标
+        if len(target_distances) >= min_frames and len(filter_target_distances) >= min_frames:
+            plt.plot(frame_indices, target_distances, label=f'Target {target_id} (Raw)', linestyle='--', color='red')
+            plt.plot(filter_frame_indices, filter_target_distances, label=f'Target {target_id} (Filtered)', linestyle='-', color='blue')
+    
+    plt.xlabel('Frame Number')
+    plt.ylabel('Distance')
+    plt.title('Target Distance Over Time')
+
+    # 将图例放置在右侧并设置透明度
+    plt.legend(loc='center left', bbox_to_anchor=(1, 0.5), framealpha=0.7)
+    
+    output_path = os.path.join(output_dir, 'target_distances.png')
+    plt.savefig(output_path, bbox_inches='tight')
+    plt.close()
     
 
 
@@ -202,10 +235,11 @@ def process_video(image_dir, depth_dir, label_dir, camera_suffix, output_dir):
     """
     images, depths, labels = load_images_and_depths(image_dir, depth_dir, camera_suffix)
     distances = {}
+    filter_distances = {}
     prev_bboxes = []
     next_id = 0
-
-    # 在process_video函数内
+    kalman_filters={}
+    # 
     for i, (image, depth, label_path) in enumerate(tqdm(zip(images, depths, labels), total=len(images), desc="Processing frames")):
         if os.path.exists(label_path):
             curr_bboxes = load_yolo_labels(label_path, image.shape[:2])
@@ -214,21 +248,39 @@ def process_video(image_dir, depth_dir, label_dir, camera_suffix, output_dir):
                 for bbox in curr_bboxes:
                     bbox['id'] = next_id
                     next_id += 1
+                    # 初始化卡尔曼滤波器
+                    kalman_filters[bbox['id']] = DepthKalmanFilter()
             else:
                 curr_bboxes, next_id = assign_ids(prev_bboxes, curr_bboxes, next_id)
                 
             for bbox in curr_bboxes:
                 if bbox['id'] not in distances:
                     distances[bbox['id']] = []
+                    filter_distances[bbox['id']] = []
+
                 distance = calculate_distance(depth, bbox['bbox'])
                 distances[bbox['id']].append((i, distance))  # 记录帧号和距离值为元组
+
+                if distance is not None:
+                    if bbox['id'] not in kalman_filters:
+                        # 如果还没有初始化卡尔曼滤波器，则初始化
+                        kalman_filters[bbox['id']] = DepthKalmanFilter()
+                    kf = kalman_filters[bbox['id']]
+                    kf.predict()
+                    kf.update(distance)
+                    filtered_distance = kf.get_current_depth()
+                    filter_distances[bbox['id']].append((i, filtered_distance))
+                else:
+                    filter_distances[bbox['id']].append((i, None))
             prev_bboxes = curr_bboxes
         else:
             for target_id in distances:
                 distances[target_id].append((i, None))  # 没有检测到目标时记录None
-
+                filter_distances[target_id].append((i, None))  # 没有检测到目标时记录None
     
-    plot_distances(distances, list(distances.keys()), output_dir, min_frames=5)
+
+    plot_distances_with_filter(distances, filter_distances, list(distances.keys()), output_dir, min_frames=5)
+
 
 
 def parse_npy(npy_path):
