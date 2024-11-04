@@ -6,6 +6,7 @@ test_dataloader_*
 gt_depths
 metric_depth_vit_giant2_800k.pth
 metric_depth_vit_small_800k.pth
+convtiny_hourglass_v1.pth
 output
 temp
 training/work_dirs
