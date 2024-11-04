@@ -1,5 +1,6 @@
 import json
 import os
+import cv2
 import numpy as np
 from PIL import Image
 
@@ -107,6 +108,44 @@ def convert_jpg_to_png_in_place(src_dir):
                 os.remove(jpg_path)
                 print(f"Deleted {jpg_path}")
 
+# 在单张图片上显示距离
+def drawRectOnSinggleImg(img_path, detect_gt_file, depthNpyPath):
+    img = cv2.imread(img_path)
+    height, width = img.shape[:2]
+   
+    
+    image_depth = np.load(depthNpyPath)
+    image_depth = np.squeeze(image_depth)
+    # print(f'原图：{image_depth.shape}')
+    
+    image_depth = cv2.resize(image_depth, (width, height))
+    # print(f'resize后：{image_depth.shape}')
+
+
+    with open(detect_gt_file, 'r') as f:
+        for line in f:
+            line = line.strip()
+            values = line.split(' ')
+            class_id = int(values[0])
+            x_center, y_center, bbox_width, bbox_height = map(float, values[1:5])
+
+            # 将归一化的坐标转换为图像坐标
+            x1 = int((x_center - bbox_width / 2) * width)
+            y1 = int((y_center - bbox_height / 2) * height)
+            x2 = int((x_center + bbox_width / 2) * width)
+            y2 = int((y_center + bbox_height / 2) * height)
+            print(f'rect:{x1},{y1},{x2},{y2}')
+            # 绘制矩形
+            cv2.rectangle(img, (x1, y1), (x2, y2), (0, 255, 0), 2)
+            # # 中心点坐标
+            center_x = int((x1 + x2) / 2)
+            center_y = int((y1 + y2) / 2)
+            # print(f'point:{center_x}, {center_y}, depth: {image_depth[center_y][center_x]} ')
+            cv2.circle(img, (center_x, center_y), 5, (0, 0, 255), -1)
+            cv2.putText(img, f'{image_depth[center_y][center_x]}', (center_x, center_y), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
+
+    cv2.imwrite('/root/autodl-tmp/metric3d/Metric3D/temp/detect_res_img1.jpg', img)
+
 
 if __name__ == '__main__':
     # npy_path = '/root/autodl-tmp/metric3d/Metric3D/gt_depths/depth_npy/train/2024-07-29_074234_000_1/000000_4_1.npy'
@@ -120,14 +159,18 @@ if __name__ == '__main__':
     # dst_dir = '/root/autodl-tmp/metric3d/Metric3D/gt_depths/depth_images'
     # convert_npy_to_png(src_dir, dst_dir)
 
-    rgb_dir = '/root/autodl-tmp/metric3d/Metric3D/gt_depths/rgb_images/images/test'
-    depth_dir = '/root/autodl-tmp/metric3d/Metric3D/gt_depths/depth_images/test'
-    output_json_path = '/root/autodl-tmp/metric3d/Metric3D/gt_depths/test_annotations.json'
-    cam_in = [5333.3333, 5333.3333, 640.0, 360.0]
-    depth_scale = 256.0
-
-    generate_json_file(rgb_dir, depth_dir, output_json_path, cam_in, depth_scale)
+    # rgb_dir = '/root/autodl-tmp/metric3d/Metric3D/gt_depths/rgb_images/images/test'
+    # depth_dir = '/root/autodl-tmp/metric3d/Metric3D/gt_depths/depth_images/test'
+    # output_json_path = '/root/autodl-tmp/metric3d/Metric3D/gt_depths/test_annotations.json'
+    # cam_in = [5333.3333, 5333.3333, 640.0, 360.0]
+    # depth_scale = 256.0
+    # generate_json_file(rgb_dir, depth_dir, output_json_path, cam_in, depth_scale)
 
 
     # src_dir = '/root/autodl-tmp/metric3d/Metric3D/gt_depths/rgb_images/images'
     # convert_jpg_to_png_in_place(src_dir)
+
+    img_path = '/root/autodl-tmp/metric3d/Metric3D/gt_depths/rgb_images/images/train/2024-07-29_074234_000_1/000474_4_1.png'
+    detect_gt_file = '/root/autodl-tmp/metric3d/Metric3D/gt_depths/rgb_images/images/train/2024-07-29_074234_000_1/000474_4_1.txt'
+    npy_path = '/root/autodl-tmp/metric3d/Metric3D/gt_depths/depth_npy/train/2024-07-29_074234_000_1/000474_4_1.npy'
+    drawRectOnSinggleImg(img_path, detect_gt_file, npy_path)

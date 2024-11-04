@@ -88,7 +88,7 @@ def calculate_iou(bbox1, bbox2):
 
     return intersection_area / union_area
 
-def match_bboxes_hungarian(prev_bboxes, curr_bboxes, iou_threshold=0.9):
+def match_bboxes_hungarian(prev_bboxes, curr_bboxes, iou_threshold=0.1):
     """
     使用匈牙利算法匹配前后两帧的边界框
     :param prev_bboxes: 前一帧的边界框列表
@@ -104,10 +104,21 @@ def match_bboxes_hungarian(prev_bboxes, curr_bboxes, iou_threshold=0.9):
 
     row_ind, col_ind = linear_sum_assignment(cost_matrix)
     matched_bboxes = [None] * len(prev_bboxes)
+    unmatched_curr_bboxes = []
+
     for i, j in zip(row_ind, col_ind):
         if cost_matrix[i, j] < 1 - iou_threshold:
             matched_bboxes[i] = curr_bboxes[j]
-    return matched_bboxes
+        else:
+            unmatched_curr_bboxes.append(curr_bboxes[j])
+
+    # 找出未被匹配的 curr_bboxes
+    matched_indices = set(col_ind)
+    for idx, curr_bbox in enumerate(curr_bboxes):
+        if idx not in matched_indices:
+            unmatched_curr_bboxes.append(curr_bbox)
+
+    return matched_bboxes, unmatched_curr_bboxes
 
 def assign_ids(prev_bboxes, curr_bboxes, next_id):
     """
@@ -117,20 +128,20 @@ def assign_ids(prev_bboxes, curr_bboxes, next_id):
     :param next_id: 下一个可用的目标ID
     :return: 匹配后的边界框列表，包含ID
     """
-    matched_bboxes = match_bboxes_hungarian(prev_bboxes, curr_bboxes)
+    matched_bboxes, unmatched_curr_bboxes = match_bboxes_hungarian(prev_bboxes, curr_bboxes)
     new_bboxes = []
+
+    # 为匹配到的边界框分配相同的ID
     for i, prev_bbox in enumerate(prev_bboxes):
         if matched_bboxes[i]:
             matched_bboxes[i]['id'] = prev_bbox['id']
             new_bboxes.append(matched_bboxes[i])
-        else:
-            new_bboxes.append(prev_bbox)
 
-    for curr_bbox in curr_bboxes:
-        if curr_bbox not in matched_bboxes:
-            curr_bbox['id'] = next_id
-            new_bboxes.append(curr_bbox)
-            next_id += 1
+    # 为未匹配的curr_bboxes分配新ID
+    for curr_bbox in unmatched_curr_bboxes:
+        curr_bbox['id'] = next_id
+        new_bboxes.append(curr_bbox)
+        next_id += 1
 
     return new_bboxes, next_id
 
@@ -149,27 +160,36 @@ def calculate_distance(depth_map, target_bbox):
     else:
         return None
 
-def plot_distances(distances, target_ids, output_dir, min_frames=100):
+def plot_distances(distances, target_ids, output_dir, min_frames=50):
     """
     绘制目标距离随时间变化的曲线图并保存为图片文件
-    :param distances: 距离字典，键为目标ID，值为距离列表
+    :param distances: 距离字典，键为目标ID，值为包含 (帧号, 距离值) 元组的列表
     :param target_ids: 目标ID列表
     :param output_dir: 输出目录
     :param min_frames: 最小连续帧数
     """
     plt.figure(figsize=(10, 6))
     for target_id in target_ids:
-        target_distances = distances[target_id]
+        # 提取帧号和距离值，过滤掉None值
+        frame_indices = [frame for frame, distance in distances[target_id] if distance is not None]
+        target_distances = [distance for _, distance in distances[target_id] if distance is not None]
+
         # 过滤掉连续帧数小于min_frames的目标
-        if sum(1 for d in target_distances if d is not None) >= min_frames:
-            plt.plot(target_distances, label=f'Target {target_id}')
+        if len(target_distances) >= min_frames:
+            plt.plot(frame_indices, target_distances, label=f'Target {target_id}')
+    
     plt.xlabel('Frame Number')
     plt.ylabel('Distance')
     plt.title('Target Distance Over Time')
-    plt.legend()
+
+    # 将图例放置在右侧并设置透明度
+    plt.legend(loc='center left', bbox_to_anchor=(1, 0.5), framealpha=0.7)
+    
     output_path = os.path.join(output_dir, 'target_distances.png')
-    plt.savefig(output_path)
+    plt.savefig(output_path, bbox_inches='tight')
     plt.close()
+    
+
 
 def process_video(image_dir, depth_dir, label_dir, camera_suffix, output_dir):
     """
@@ -185,6 +205,7 @@ def process_video(image_dir, depth_dir, label_dir, camera_suffix, output_dir):
     prev_bboxes = []
     next_id = 0
 
+    # 在process_video函数内
     for i, (image, depth, label_path) in enumerate(tqdm(zip(images, depths, labels), total=len(images), desc="Processing frames")):
         if os.path.exists(label_path):
             curr_bboxes = load_yolo_labels(label_path, image.shape[:2])
@@ -195,22 +216,26 @@ def process_video(image_dir, depth_dir, label_dir, camera_suffix, output_dir):
                     next_id += 1
             else:
                 curr_bboxes, next_id = assign_ids(prev_bboxes, curr_bboxes, next_id)
+                
             for bbox in curr_bboxes:
                 if bbox['id'] not in distances:
                     distances[bbox['id']] = []
                 distance = calculate_distance(depth, bbox['bbox'])
-                distances[bbox['id']].append(distance)
+                distances[bbox['id']].append((i, distance))  # 记录帧号和距离值为元组
             prev_bboxes = curr_bboxes
         else:
             for target_id in distances:
-                distances[target_id].append(None)
+                distances[target_id].append((i, None))  # 没有检测到目标时记录None
+
     
-    plot_distances(distances, list(distances.keys()), output_dir, min_frames=100)
+    plot_distances(distances, list(distances.keys()), output_dir, min_frames=5)
 
 
 def parse_npy(npy_path):
     data = np.load(npy_path)
     print(data.shape)
+
+
 
 if __name__ == '__main__':
     # npy_path = '/root/autodl-tmp/metric3d/Metric3D/gt_depths/depth_npy/train/2024-07-29_074234_000_1/000000_4_1.npy'
@@ -218,10 +243,12 @@ if __name__ == '__main__':
 
 
     # 示例调用
-    image_dir = '/root/autodl-tmp/monodepth2/monodepth2/dataset/mon/mon/images/train/2024-07-29_074234_000_1'
-    depth_dir = '/root/autodl-tmp/metric3d/Metric3D/gt_depths/depth_npy/train/2024-07-29_074234_000_1'
-    label_dir = '/root/autodl-tmp/monodepth2/monodepth2/dataset/mon/mon/images/train/2024-07-29_074234_000_1'
-    camera_suffix = '1'  # 选择左相机
+    image_dir = '/root/autodl-tmp/monodepth2/monodepth2/dataset/mon/mon/images/train/2024-07-29_074234_000_3'
+    depth_dir = '/root/autodl-tmp/metric3d/Metric3D/gt_depths/depth_npy/train/2024-07-29_074234_000_3'
+    label_dir = '/root/autodl-tmp/monodepth2/monodepth2/dataset/mon/mon/images/train/2024-07-29_074234_000_3'
+    camera_suffix = '2'  # 选择左相机
     output_dir = '/root/autodl-tmp/metric3d/Metric3D/temp'
 
     process_video(image_dir, depth_dir, label_dir, camera_suffix, output_dir)
+
+
