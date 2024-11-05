@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 from scipy.optimize import linear_sum_assignment
 from tqdm import tqdm
 from scipy.ndimage import zoom  # 导入缩放库
-from kf import *  
+from postprocess.kf import *  
 def load_images_and_depths(image_dir, depth_dir, camera_suffix, image_extensions=('jpg', 'png')):
     """
     加载图像和深度图
@@ -89,7 +89,9 @@ def calculate_iou(bbox1, bbox2):
     bbox2_area = w2 * h2
     union_area = bbox1_area + bbox2_area - intersection_area
 
-    return intersection_area / union_area
+    # 添加一个极小值，防止除以零
+    epsilon = 1e-6
+    return intersection_area / (union_area + epsilon)
 
 def match_bboxes_hungarian(prev_bboxes, curr_bboxes, iou_threshold=0.2):
     """

@@ -159,11 +159,68 @@ except:
 
 from mono.model.monodepth_model import get_configured_monodepth_model
 from postprocess.kf import DepthKalmanFilter 
-from postprocess.postprocess import assign_ids, calculate_distance
+from postprocess.postprocess import assign_ids, calculate_distance, load_yolo_labels
+
+
+distances = {}
+filter_distances = {}
+prev_bboxes = []
+next_id = 0
+kalman_filters = {}
+
+def postprocess_param_init():
+    global distances, filter_distances, prev_bboxes, next_id, kalman_filters
+    distances = {}
+    filter_distances = {}
+    prev_bboxes = []
+    next_id = 0
+    kalman_filters = {}
+
+def postprocess(det, depth):
+    global distances, filter_distances, prev_bboxes, next_id, kalman_filters
+    curr_bboxes = det
+
+    if len(curr_bboxes) == 0:
+        for target_id in distances:
+            distances[target_id].append((None, None))  # 没有检测到目标时记录None
+            filter_distances[target_id].append((None, None))  # 没有检测到目标时记录None
+        return
+
+    if len(prev_bboxes) == 0:
+        # 第一帧为每个边界框分配初始id
+        for bbox in curr_bboxes:
+            bbox['id'] = next_id
+            next_id += 1
+            # 初始化卡尔曼滤波器
+            kalman_filters[bbox['id']] = DepthKalmanFilter()
+    else:
+        curr_bboxes, next_id = assign_ids(prev_bboxes, curr_bboxes, next_id)
+
+    for bbox in curr_bboxes:
+        if bbox['id'] not in distances:
+            distances[bbox['id']] = []
+            filter_distances[bbox['id']] = []
+
+        distance = calculate_distance(depth, bbox['bbox'])
+        distances[bbox['id']].append((None, distance))  # 记录帧号和距离值为元组
+
+        if distance is not None:
+            if bbox['id'] not in kalman_filters:
+                # 如果还没有初始化卡尔曼滤波器，则初始化
+                kalman_filters[bbox['id']] = DepthKalmanFilter()
+            kf = kalman_filters[bbox['id']]
+            kf.predict()
+            kf.update(distance)
+            filtered_distance = kf.get_current_depth()
+            filter_distances[bbox['id']].append((None, filtered_distance))
+        else:
+            filter_distances[bbox['id']].append((None, None))
+
+    prev_bboxes = curr_bboxes
 
 
 
-def test_simple_trained(rgb_file, model, isPostprocess=False):
+def test_simple_trained(rgb_file, model):
     start_time = time.time()
     intrinsic = [5333.3333, 5333.3333, 640.0, 360.0]
     gt_depth_scale = 256.0
@@ -221,26 +278,44 @@ def load_model(cfg_file, ckpt_file):
     model.load_state_dict(torch.load(ckpt_file)['model_state_dict'], strict=False)
     return model
 
-def process_images(input_dir, output_dir, model):
+def process_images(input_dir, output_dir, model, camera_suffix):
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
     for root, dirs, files in os.walk(input_dir):
-        for file in files:
-            if file.lower().endswith(('.png', '.jpg', '.jpeg')):
-                input_file_path = os.path.join(root, file)
-                relative_path = os.path.relpath(root, input_dir)
-                output_subdir = os.path.join(output_dir, relative_path)
-                if not os.path.exists(output_subdir):
-                    os.makedirs(output_subdir)
-                output_file_path = os.path.join(output_subdir, os.path.splitext(file)[0] + '.npy')
-                pred_depth = test_simple_trained(input_file_path, model)
-                np.save(output_file_path, pred_depth.cpu().numpy())
+        for dir_name in dirs:
+            video_dir = os.path.join(root, dir_name)
+            output_subdir = os.path.join(output_dir, os.path.relpath(video_dir, input_dir))
+            if not os.path.exists(output_subdir):
+                os.makedirs(output_subdir)
+
+            # 重置后处理参数
+            postprocess_param_init()
+
+            for file in sorted(os.listdir(video_dir)):
+                if file.lower().endswith(('.png', '.jpg', '.jpeg')) and file.endswith(camera_suffix):
+                    input_file_path = os.path.join(video_dir, file)
+                    output_file_path = os.path.join(output_subdir, os.path.splitext(file)[0] + '.npy')
+                    label_file_path = os.path.join(video_dir, os.path.splitext(file)[0] + '.txt')
+
+                    pred_depth = test_simple_trained(input_file_path, model)
+                    # np.save(output_file_path, pred_depth.cpu().numpy())
+
+                    # 进行后处理
+                    # 加载YOLO标签文件
+                    image_shape = cv2.imread(input_file_path).shape[:2]
+                    det = load_yolo_labels(label_file_path, image_shape)
+                    
+                    start_time = time.time()
+                    postprocess(det, pred_depth.cpu().numpy())
+                    end_time = time.time()
+                    print(f"Postprocessing time: {end_time - start_time:.4f} seconds")
 
 if __name__ == '__main__':
     cfg_file = '/root/autodl-tmp/metric3d/Metric3D/training/mono/configs/RAFTDecoder/vit.raft5.small.kitti.py'
     ckpt_file = '/root/autodl-tmp/metric3d/Metric3D/metric_depth_vit_small_800k.pth'
     input_dir = '/root/autodl-tmp/metric3d/Metric3D/gt_depths/rgb_images/images'
     output_dir = '/root/autodl-tmp/metric3d/Metric3D/test_output'
+    camera_suffix = '_1.png'  # 选择左相机
     model = load_model(cfg_file, ckpt_file)
-    process_images(input_dir, output_dir, model)
+    process_images(input_dir, output_dir, model, camera_suffix)
