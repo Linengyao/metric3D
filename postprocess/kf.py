@@ -70,6 +70,8 @@
 
 import numpy as np
 from collections import deque
+from filterpy.kalman import UnscentedKalmanFilter as UKF
+from filterpy.kalman import MerweScaledSigmaPoints
 import matplotlib.pyplot as plt
 
 class DepthKalmanFilter:
@@ -162,33 +164,149 @@ class DepthKalmanFilter:
         获取历史深度值。
         """
         return [state[0, 0] for state in self.history]
+ #################### UKF  Begin#######################   
+def fx(x, dt):
+    """
+    状态转移函数。
+    x: 状态向量 [位置, 速度]
+    dt: 时间步长
+    """
+    F = np.array([
+        [1, dt],
+        [0, 1]
+    ])
+    return F @ x
 
+def hx(x):
+    """
+    测量函数。
+    x: 状态向量 [位置, 速度]
+    返回位置
+    """
+    return np.array([x[0]])
+
+class DepthUKF:
+    def __init__(self, dt=1.0, process_noise_std=0.01, measurement_noise_std=4.0, initial_position=0.0, initial_velocity=0.0):
+        """
+        初始化深度无迹卡尔曼滤波器。
+        
+        参数:
+        - dt: 时间步长
+        - process_noise_std: 过程噪声的标准差
+        - measurement_noise_std: 测量噪声的标准差
+        - initial_position: 初始位置
+        - initial_velocity: 初始速度
+        """
+        # 定义 sigma 点
+        points = MerweScaledSigmaPoints(n=2, alpha=0.1, beta=2., kappa=0)
+        
+        # 初始化 UKF
+        self.ukf = UKF(dim_x=2, dim_z=1, fx=lambda x, dt: fx(x, dt), hx=hx, dt=dt, points=points)
+        
+        # 初始化状态
+        self.ukf.x = np.array([initial_position, initial_velocity])
+        
+        # 初始化协方差
+        self.ukf.P = np.eye(2) * 1000.0  # 大的初始不确定性
+        
+        # 过程噪声协方差矩阵 Q
+        self.ukf.Q = np.eye(2) * (process_noise_std**2)
+        
+        # 测量噪声协方差矩阵 R
+        self.ukf.R = np.array([[measurement_noise_std**2]])
+        
+        # 历史记录
+        self.history = []
+    
+    def predict(self):
+        """
+        卡尔曼滤波器的预测步骤。
+        """
+        self.ukf.predict()
+    
+    def update(self, z):
+        """
+        卡尔曼滤波器的更新步骤。
+        
+        参数:
+        - z: 当前测量值
+        """
+        self.ukf.update(z)
+        self.history.append(self.ukf.x.copy())
+    
+    def get_current_depth(self):
+        """
+        获取当前滤波后的深度值。
+        """
+        return self.ukf.x[0]
+    
+    def get_history(self):
+        """
+        获取历史深度值。
+        """
+        return [state[0] for state in self.history]
+
+################### UKF END ###############################
 # 示例调用
 if __name__ == "__main__":
-    # 模拟一些有噪声的深度数据
+
+    # # 模拟一些有噪声的深度数据
+    # measurements = [
+    #     205.68837, 204.15869, 201.76071, 201.15349, 195.99513, 
+    #     204.04909, 199.85182, 203.07367, 202.56609, 199.32358, 
+    #     203.79509, 204.58954, 206.19106, 202.6621, 201.05463, 
+    #     195.91321, 208.1742, 202.28864, 202.42557, 204.49889
+    # ]
+
+    # # 初始化卡尔曼滤波器
+    # kf = DepthKalmanFilter(
+    #     dt=1, 
+    #     process_noise_std=0.1, 
+    #     measurement_noise_std=4.0, 
+    #     initial_position=measurements[0], 
+    #     initial_velocity=0.0
+    # )
+
+    # # 存储滤波结果
+    # estimated_depths = []
+
+    # for z in measurements:
+    #     kf.predict()
+    #     kf.update(z)
+    #     estimated_depths.append(kf.get_current_depth())
+    #     print(kf.get_current_depth())
+
+    # 模拟一些有噪声的深度数据，包括突变
     measurements = [
         205.68837, 204.15869, 201.76071, 201.15349, 195.99513, 
         204.04909, 199.85182, 203.07367, 202.56609, 199.32358, 
         203.79509, 204.58954, 206.19106, 202.6621, 201.05463, 
         195.91321, 208.1742, 202.28864, 202.42557, 204.49889
     ]
-
-    # 初始化卡尔曼滤波器
-    kf = DepthKalmanFilter(
-        dt=1, 
+    
+    # 初始化 UKF
+    ukf_filter = DepthUKF(
+        dt=1.0, 
         process_noise_std=0.1, 
-        measurement_noise_std=4.0, 
+        measurement_noise_std=20.0,  # 增加测量噪声以减少对突变的敏感性
         initial_position=measurements[0], 
         initial_velocity=0.0
     )
-
+    
     # 存储滤波结果
     estimated_depths = []
-
+    
     for z in measurements:
-        kf.predict()
-        kf.update(z)
-        estimated_depths.append(kf.get_current_depth())
-        print(kf.get_current_depth())
+        estimated_depth = ukf_filter.predict_and_update(z)
+        estimated_depths.append(estimated_depth)
+        print(f"测量值: {z}, 滤波后深度: {estimated_depth}")
 
+
+
+
+
+
+
+
+    
 

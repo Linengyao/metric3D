@@ -7,25 +7,28 @@ import matplotlib.pyplot as plt
 from scipy.optimize import linear_sum_assignment
 from tqdm import tqdm
 from scipy.ndimage import zoom  # 导入缩放库
-from kf import DepthKalmanFilter  
-def load_images_and_depths(image_dir, depth_dir, camera_suffix):
+from kf import *  
+def load_images_and_depths(image_dir, depth_dir, camera_suffix, image_extensions=('jpg', 'png')):
     """
     加载图像和深度图
     :param image_dir: 图像目录
     :param depth_dir: 深度图目录
     :param camera_suffix: 相机后缀，'1' 表示左相机，'2' 表示右相机
+    :param image_extensions: 支持的图像文件扩展名，默认为 ('jpg', 'png')
     :return: 图像列表和深度图列表
     """
     images = []
     depths = []
     labels = []
+    
     for filename in sorted(os.listdir(image_dir)):
-        if filename.endswith(f"_{camera_suffix}.jpg"):
+        base_name, ext = os.path.splitext(filename)
+        if base_name.endswith(f"_{camera_suffix}") and ext[1:] in image_extensions:
             image_path = os.path.join(image_dir, filename)
-            depth_filename = filename.replace(".jpg", ".npy")
+            depth_filename = f"{base_name}.npy"
             depth_path = os.path.join(depth_dir, depth_filename)
-            label_filename = filename.replace(".jpg", ".txt")
-            label_path = os.path.join(image_dir, label_filename) # 标签文件和image文件在同一路径下
+            label_filename = f"{base_name}.txt"
+            label_path = os.path.join(image_dir, label_filename)  # 标签文件和image文件在同一路径下
 
             if os.path.exists(depth_path):
                 image = cv2.imread(image_path)
@@ -88,7 +91,7 @@ def calculate_iou(bbox1, bbox2):
 
     return intersection_area / union_area
 
-def match_bboxes_hungarian(prev_bboxes, curr_bboxes, iou_threshold=0.1):
+def match_bboxes_hungarian(prev_bboxes, curr_bboxes, iou_threshold=0.2):
     """
     使用匈牙利算法匹配前后两帧的边界框
     :param prev_bboxes: 前一帧的边界框列表
@@ -224,6 +227,91 @@ def plot_distances_with_filter(distances, filter_distances, target_ids, output_d
     
 
 
+def plot_distances_with_range(distances, filter_distances, target_ids, output_dir, min_frames=50):
+    """
+    绘制目标距离随时间变化的曲线图并保存为图片文件，包含原始距离的波动范围
+    :param distances: 原始距离字典，键为目标ID，值为包含 (帧号, 距离值) 元组的列表
+    :param filter_distances: 滤波后的距离字典，键为目标ID，值为包含 (帧号, 距离值) 元组的列表
+    :param target_ids: 目标ID列表
+    :param output_dir: 输出目录
+    :param min_frames: 最小连续帧数
+    """
+    plt.figure(figsize=(10, 6))
+    for target_id in target_ids:
+        # 提取帧号和距离值，过滤掉None值
+        frame_indices = [frame for frame, distance in distances[target_id] if distance is not None]
+        target_distances = [distance for _, distance in distances[target_id] if distance is not None]
+        filter_frame_indices = [frame for frame, distance in filter_distances[target_id] if distance is not None]
+        filter_target_distances = [distance for _, distance in filter_distances[target_id] if distance is not None]
+
+        # 过滤掉连续帧数小于min_frames的目标
+        if len(target_distances) >= min_frames and len(filter_target_distances) >= min_frames:
+            # 计算最大最小值范围，假设偏差为固定值 20（可以根据实际情况调整）
+            min_values = [d - 20 for d in target_distances]
+            max_values = [d + 20 for d in target_distances]
+
+            # 绘制原始距离的波动范围
+            plt.fill_between(frame_indices, min_values, max_values, color='red', alpha=0.3, label=f'Target {target_id} (Raw Range)')
+
+            # 绘制滤波后的距离
+            plt.plot(filter_frame_indices, filter_target_distances, label=f'Target {target_id} (Filtered)', linestyle='-', color='blue')
+
+    plt.xlabel('Frame Number')
+    plt.ylabel('Distance')
+    plt.title('Target Distance with Raw Range and Filtered Line')
+
+    # 将图例放置在右侧并设置透明度
+    plt.legend(loc='center left', bbox_to_anchor=(1, 0.5), framealpha=0.7)
+
+    # 保存图片
+    output_path = os.path.join(output_dir, 'target_distances_with_range.png')
+    plt.savefig(output_path, bbox_inches='tight')
+    plt.close()
+def plot_distances_with_rate(distances, filter_distances, target_ids, output_dir, min_frames=50):
+    """
+    绘制目标距离随时间变化的曲线图以及变化率，并保存为图片文件
+    :param distances: 原始距离字典，键为目标ID，值为包含 (帧号, 距离值) 元组的列表
+    :param filter_distances: 滤波后的距离字典，键为目标ID，值为包含 (帧号, 距离值) 元组的列表
+    :param target_ids: 目标ID列表
+    :param output_dir: 输出目录
+    :param min_frames: 最小连续帧数
+    """
+    plt.figure(figsize=(12, 8))
+
+    for target_id in target_ids:
+        # 提取帧号和距离值，过滤掉None值
+        frame_indices = [frame for frame, distance in distances[target_id] if distance is not None]
+        target_distances = [distance for _, distance in distances[target_id] if distance is not None]
+        filter_frame_indices = [frame for frame, distance in filter_distances[target_id] if distance is not None]
+        filter_target_distances = [distance for _, distance in filter_distances[target_id] if distance is not None]
+
+        # 过滤掉连续帧数小于min_frames的目标
+        if len(target_distances) >= min_frames and len(filter_target_distances) >= min_frames:
+            # 计算原始距离和滤波后距离的变化率
+            raw_rate = [abs(target_distances[i + 1] - target_distances[i]) for i in range(len(target_distances) - 1)]
+            filtered_rate = [abs(filter_target_distances[i + 1] - filter_target_distances[i]) for i in range(len(filter_target_distances) - 1)]
+            rate_frame_indices = frame_indices[:-1]  # 因为变化率少一帧
+
+            # 绘制原始距离变化率
+            plt.plot(rate_frame_indices, raw_rate, linestyle='--', color='red', alpha=0.7, label=f'Target {target_id} (Raw Rate)')
+
+            # 绘制滤波后距离变化率
+            plt.plot(rate_frame_indices, filtered_rate, linestyle='-', color='blue', alpha=0.7, label=f'Target {target_id} (Filtered Rate)')
+
+    plt.xlabel('Frame Number')
+    plt.ylabel('Distance Change Rate')
+    plt.title('Target Distance Change Rate Over Time')
+
+    # 将图例放置在右侧并设置透明度
+    plt.legend(loc='center left', bbox_to_anchor=(1, 0.5), framealpha=0.7)
+
+    # 保存图片
+    output_path = os.path.join(output_dir, 'target_distance_change_rate.png')
+    plt.savefig(output_path, bbox_inches='tight')
+    plt.close()
+
+
+
 def process_video(image_dir, depth_dir, label_dir, camera_suffix, output_dir):
     """
     处理视频，计算目标距离并绘制曲线图
@@ -279,8 +367,9 @@ def process_video(image_dir, depth_dir, label_dir, camera_suffix, output_dir):
                 filter_distances[target_id].append((i, None))  # 没有检测到目标时记录None
     
 
-    plot_distances_with_filter(distances, filter_distances, list(distances.keys()), output_dir, min_frames=5)
-
+    # plot_distances_with_filter(distances, filter_distances, list(distances.keys()), output_dir, min_frames=90)
+    # plot_distances_with_range(distances, filter_distances, list(distances.keys()), output_dir, min_frames=90)
+    plot_distances_with_rate(distances, filter_distances, list(distances.keys()), output_dir, min_frames=90)
 
 
 def parse_npy(npy_path):
@@ -295,10 +384,10 @@ if __name__ == '__main__':
 
 
     # 示例调用
-    image_dir = '/root/autodl-tmp/monodepth2/monodepth2/dataset/mon/mon/images/train/2024-07-29_074234_000_3'
-    depth_dir = '/root/autodl-tmp/metric3d/Metric3D/gt_depths/depth_npy/train/2024-07-29_074234_000_3'
-    label_dir = '/root/autodl-tmp/monodepth2/monodepth2/dataset/mon/mon/images/train/2024-07-29_074234_000_3'
-    camera_suffix = '2'  # 选择左相机
+    image_dir = '/root/autodl-tmp/metric3d/Metric3D/gt_depths/rgb_images/images/train/2024-07-29_074234_000_2'
+    depth_dir = '/root/autodl-tmp/metric3d/Metric3D/test_output/train/2024-07-29_074234_000_2'
+    label_dir = '/root/autodl-tmp/metric3d/Metric3D/gt_depths/rgb_images/images/train/2024-07-29_074234_000_2'
+    camera_suffix = '1'  # 选择左相机
     output_dir = '/root/autodl-tmp/metric3d/Metric3D/temp'
 
     process_video(image_dir, depth_dir, label_dir, camera_suffix, output_dir)

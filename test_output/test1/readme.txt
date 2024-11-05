@@ -1,1 +1,0 @@
-这个文件夹下存放的是使用自己从0开始训练的模型推理的结果文件，推理的模型为/root/autodl-tmp/metric3d/Metric3D/training/work_dirs/vit.raft5.small.kitti/20241031_160529/ckpt/step00020000.pth

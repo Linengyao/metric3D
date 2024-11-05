@@ -170,7 +170,7 @@ if __name__ == '__main__':
     # src_dir = '/root/autodl-tmp/metric3d/Metric3D/gt_depths/rgb_images/images'
     # convert_jpg_to_png_in_place(src_dir)
 
-    img_path = '/root/autodl-tmp/metric3d/Metric3D/gt_depths/rgb_images/images/train/2024-07-29_074234_000_1/000474_4_1.png'
-    detect_gt_file = '/root/autodl-tmp/metric3d/Metric3D/gt_depths/rgb_images/images/train/2024-07-29_074234_000_1/000474_4_1.txt'
-    npy_path = '/root/autodl-tmp/metric3d/Metric3D/gt_depths/depth_npy/train/2024-07-29_074234_000_1/000474_4_1.npy'
+    img_path = '/root/autodl-tmp/metric3d/Metric3D/gt_depths/rgb_images/images/train/2024-07-29_074234_000_1/000000_4_1.png'
+    detect_gt_file = '/root/autodl-tmp/metric3d/Metric3D/gt_depths/rgb_images/images/train/2024-07-29_074234_000_1/000000_4_1.txt'
+    npy_path = '/root/autodl-tmp/metric3d/Metric3D/test_output/train/2024-07-29_074234_000_1/000000_4_1.npy'
     drawRectOnSinggleImg(img_path, detect_gt_file, npy_path)
