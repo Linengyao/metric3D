@@ -11,3 +11,4 @@ output
 temp
 training/work_dirs
 *.pth
+test_output
