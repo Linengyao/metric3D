@@ -242,6 +242,5 @@ if __name__ == '__main__':
     ckpt_file = '/root/autodl-tmp/metric3d/Metric3D/metric_depth_vit_small_800k.pth'
     input_dir = '/root/autodl-tmp/metric3d/Metric3D/gt_depths/rgb_images/images'
     output_dir = '/root/autodl-tmp/metric3d/Metric3D/test_output'
-
     model = load_model(cfg_file, ckpt_file)
     process_images(input_dir, output_dir, model)
