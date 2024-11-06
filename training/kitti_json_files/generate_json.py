@@ -1,7 +1,7 @@
 import os
 import json
 
-common_root = 'd:/Datasets'
+common_root = 'd:/Datasets'#/home/share/train_schedule/zhangdaopeng/script/classifer
 depth_root = 'kitti/kitti_depth/depth/data_depth_annotated'
 raw_root = 'kitti_raw/kitti_raw'
 

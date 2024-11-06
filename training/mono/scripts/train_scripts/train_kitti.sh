@@ -1,15 +1,8 @@
-#!/bin/bash
-
-# 切换到项目根目录
 cd ../../../
 
-# 启动训练
-python mono/tools/train.py \
-  mono/configs/RAFTDecoder/vit.raft5.small.kitti.py \
-  --use-tensorboard \
-  --experiment_name set1 \
-  --seed 42 \
-  --launcher None \
-#   --load-from None \
-#   --resume-from None
-  
+python  mono/tools/train.py \
+        mono/configs/RAFTDecoder/vit.raft5.large.kitti.py \
+        --use-tensorboard \
+        --launcher slurm \
+        # --load-from /home/share/train_schedule/zhangdaopeng/mmyolo-main/work_dirs/Metric3D-main/weight/metric_depth_vit_small_800k.pth \
+        --experiment_name set1

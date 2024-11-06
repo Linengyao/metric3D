@@ -15,37 +15,20 @@ def load_data_info(module_name, data_info={}, db_type='db_info', module=None):
     else:
         raise RuntimeError(f'Try to access "db_info", but cannot find {module_name} module.')
 
-# def reset_ckpt_path(cfg, data_info):
-#     if isinstance(cfg, dict):
-#         for key in cfg.keys():
-#             if key == 'backbone':
-#                 new_ckpt_path = data_info['checkpoint']['db_root'] + '/' + data_info['checkpoint'][cfg.backbone.type]
-#                 cfg.backbone.update(checkpoint=new_ckpt_path)
-#                 continue
-#             elif isinstance(cfg.get(key), dict):
-#                 reset_ckpt_path(cfg.get(key), data_info)
-#             else:
-#                 continue
-#     else:
-#         return
-    
 def reset_ckpt_path(cfg, data_info):
-    if isinstance(cfg, dict):
-        for key in cfg.keys():
-            if key == 'backbone':
-                # 获取预训练模型路径
-                ckpt_path = data_info['checkpoint'].get(cfg.backbone.type)
-                if ckpt_path:
-                    # 拼接路径
-                    new_ckpt_path = data_info['checkpoint']['db_root'] + '/' + ckpt_path
-                    cfg.backbone.update(checkpoint=new_ckpt_path)
-                continue
-            elif isinstance(cfg.get(key), dict):
-                reset_ckpt_path(cfg.get(key), data_info)
-            else:
-                continue
-    else:
-        return
+    return
+    # if isinstance(cfg, dict):
+    #     for key in cfg.keys():
+    #         if key == 'backbone':
+    #             new_ckpt_path = data_info['checkpoint']['db_root'] + '/' + data_info['checkpoint'][cfg.backbone.type]
+    #             cfg.backbone.update(checkpoint=new_ckpt_path)
+    #             continue
+    #         elif isinstance(cfg.get(key), dict):
+    #             reset_ckpt_path(cfg.get(key), data_info)
+    #         else:
+    #             continue
+    # else:
+    #     return
 
 if __name__ == '__main__':
     db_info_tmp = {}

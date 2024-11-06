@@ -274,21 +274,13 @@ db_info['ScanNet'] = {
     'test_annotations_path': 'ScanNet/ScanNet/annotations/test.json',
     'val_annotations_path': 'ScanNet/ScanNet/annotations/test.json',
 }
-# # KITTI, RGBD dataset
-# db_info['KITTI'] = {
-#     'db_root': 'tbd_data_root',
-#     'data_root': '',
-#     'train_annotations_path': 'KITTI/KITTI/annotations/eigen_train.json',
-#     'test_annotations_path': 'KITTI/KITTI/annotations/eigen_test.json',
-#     'val_annotations_path': 'KITTI/KITTI/annotations/eigen_test.json',
-# }
-
+# KITTI, RGBD dataset
 db_info['KITTI'] = {
     'db_root': '',
     'data_root': '',
-    'train_annotations_path': '/root/autodl-tmp/metric3d/Metric3D/gt_depths/train_annotations.json',
-    'test_annotations_path': '/root/autodl-tmp/metric3d/Metric3D/gt_depths/test_annotations.json',
-    'val_annotations_path': '/root/autodl-tmp/metric3d/Metric3D/gt_depths/test_annotations.json',
+    'train_annotations_path': '/root/autodl-tmp/metric3d/Metric3D/training/kitti_json_files/eigen_train.json',
+    'test_annotations_path': '/root/autodl-tmp/metric3d/Metric3D/training/kitti_json_files/eigen_test.json',
+    'val_annotations_path': '/root/autodl-tmp/metric3d/Metric3D/training/kitti_json_files/eigen_test.json',
 }
 
 
@@ -346,15 +338,15 @@ db_info['Replica_gso'] = {
     'val_annotations_path': 'Replica/replica_gso/annotations/val.json',
 }
 
-db_info['Matterport3D'] = {
-    'db_root': 'tbd_data_root',
-    'data_root': 'Matterport3D',
-    'meta_data_root': 'Matterport3D',
-    'normal_root': 'Matterport3D',
-    'train_annotations_path': 'Matterport3D/Matterport3D/annotations/train.json',
-    'test_annotations_path': 'Matterport3D/Matterport3D/annotations/test.json',
-    'val_annotations_path': 'Matterport3D/Matterport3D/annotations/test.json',
-}
+# db_info['Matterport3D'] = {
+#     'db_root': 'tbd_data_root',
+#     'data_root': 'Matterport3D',
+#     'meta_data_root': 'Matterport3D',
+#     'normal_root': 'Matterport3D',
+#     'train_annotations_path': 'Matterport3D/Matterport3D/annotations/train.json',
+#     'test_annotations_path': 'Matterport3D/Matterport3D/annotations/test.json',
+#     'val_annotations_path': 'Matterport3D/Matterport3D/annotations/test.json',
+# }
 
 db_info['S3DIS'] = {
     'db_root': 'tbd_data_root',

@@ -65,26 +65,11 @@ def do_train(local_rank: int, cfg: dict):
                                                    pin_memory=True,
                                                    generator=g,)
                                                 #    collate_fn=collate_fn)
-    # if isinstance(val_dataset, list):
-    #     val_dataloader = [torch.utils.data.DataLoader(dataset=val_dataset,
-    #                                                   batch_size=1,
-    #                                                   num_workers=0,
-    #                                                   sampler=torch.utils.data.distributed.DistributedSampler(val_dataset, shuffle=False),
-    #                                                   drop_last=True,
-    #                                                   pin_memory=True,) for val_group in val_dataset for val_dataset in val_group]
-    # else:
-    #     val_dataloader = torch.utils.data.DataLoader(dataset=val_dataset,
-    #                                             batch_size=1,
-    #                                             num_workers=0,
-    #                                             sampler=val_sampler,
-    #                                             drop_last=True,
-    #                                             pin_memory=True,)
-
     if isinstance(val_dataset, list):
         val_dataloader = [torch.utils.data.DataLoader(dataset=val_dataset,
                                                       batch_size=1,
                                                       num_workers=0,
-                                                      sampler=None,
+                                                      sampler=torch.utils.data.distributed.DistributedSampler(val_dataset, shuffle=False),
                                                       drop_last=True,
                                                       pin_memory=True,) for val_group in val_dataset for val_dataset in val_group]
     else:
@@ -94,7 +79,7 @@ def do_train(local_rank: int, cfg: dict):
                                                 sampler=val_sampler,
                                                 drop_last=True,
                                                 pin_memory=True,)
-
+    
     # build schedule
     lr_scheduler = build_lr_schedule_with_cfg(cfg)
     optimizer = build_optimizer_with_cfg(cfg, model)
@@ -105,7 +90,7 @@ def do_train(local_rank: int, cfg: dict):
         model = torch.nn.parallel.DistributedDataParallel(model.cuda(), 
                                                           device_ids=[local_rank], 
                                                           output_device=local_rank, 
-                                                          find_unused_parameters=False)
+                                                          find_unused_parameters=True)
     else:
         model = torch.nn.DataParallel(model.cuda())
     
@@ -335,11 +320,14 @@ def train_by_iters_amp(cfg, model, optimizer, lr_scheduler, train_dataloader, va
             except:
                 logger.info('Some training data errors exist in the current iter!')
                 continue
-
+            # if step%100==0:
+            #     np.save('merge{}.npy'.format(step), data['target'].detach().squeeze().cpu().numpy())
             data = to_cuda(data)
 
             with torch.cuda.amp.autocast(dtype=torch.bfloat16):
                 pred_depth, losses_dict, conf = model(data)
+            # if step%100==0:
+            #     np.save('merge{}.npy'.format(step), pred_depth.detach().squeeze().cpu().numpy())
 
             total_loss = losses_dict['total_loss'] / acc_batch
 

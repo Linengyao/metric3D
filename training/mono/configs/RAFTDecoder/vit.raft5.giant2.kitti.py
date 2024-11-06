@@ -40,6 +40,7 @@ data_basic=dict(
         focal_length=1000.0,
     ),
     depth_range=(0, 1),
+    clip_depth_range=(0,200),
     depth_normalize=(0.1, 200),
 #     crop_size=(544, 1216),
 #     crop_size = (544, 992),

@@ -1,6 +1,7 @@
 import json
 import os
 import cv2
+from matplotlib import cm
 import numpy as np
 from PIL import Image
 
@@ -33,6 +34,9 @@ def npy2pngSingle(npy_path, output_path):
     # 将数据转换为 PIL 图像对象
     image = Image.fromarray(data)
     
+    # 调整大小
+    image = image.resize((1280, 720), Image.ANTIALIAS)
+
     # 确保目标目录存在
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     
@@ -146,9 +150,36 @@ def drawRectOnSinggleImg(img_path, detect_gt_file, depthNpyPath):
 
     cv2.imwrite('/root/autodl-tmp/metric3d/Metric3D/temp/detect_res_img1.jpg', img)
 
+def npy2colored_png(npy_path, output_path, colormap='viridis'):
+    # 加载 .npy 文件
+    data = np.load(npy_path)
+    
+    # 检查数据的形状
+    if data.shape != (720, 1280):
+        raise ValueError(f"Unexpected shape: {data.shape}. Expected (720, 1280).")
+    
+    # 将数据从 [0, 500] 映射到 [0, 1]
+    data = data / 500.0
+    
+    # 使用 colormap 将数据转换为彩色图像
+    cmap = cm.get_cmap(colormap)
+    colored_data = cmap(data)
+    
+    # 将彩色图像转换为 uint8 类型
+    colored_data = (colored_data[:, :, :3] * 255).astype(np.uint8)
+    
+    # 将数据转换为 PIL 图像对象
+    image = Image.fromarray(colored_data)
+    
+    # 确保目标目录存在
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    
+    # 保存为 PNG 文件
+    image.save(output_path)
+
 
 if __name__ == '__main__':
-    # npy_path = '/root/autodl-tmp/metric3d/Metric3D/gt_depths/depth_npy/train/2024-07-29_074234_000_1/000000_4_1.npy'
+    # npy_path = '/root/autodl-tmp/metric3d/Metric3D/temp/000000_4_1.npy'
     # parseSingleNpy(npy_path)
 
     # npy_path = '/root/autodl-tmp/metric3d/Metric3D/gt_depths/depth_npy/train/2024-07-29_074234_000_1/000000_4_1.npy'
@@ -170,7 +201,11 @@ if __name__ == '__main__':
     # src_dir = '/root/autodl-tmp/metric3d/Metric3D/gt_depths/rgb_images/images'
     # convert_jpg_to_png_in_place(src_dir)
 
-    img_path = '/root/autodl-tmp/metric3d/Metric3D/gt_depths/rgb_images/images/train/2024-07-29_074234_000_1/000000_4_1.png'
-    detect_gt_file = '/root/autodl-tmp/metric3d/Metric3D/gt_depths/rgb_images/images/train/2024-07-29_074234_000_1/000000_4_1.txt'
-    npy_path = '/root/autodl-tmp/metric3d/Metric3D/test_output/train/2024-07-29_074234_000_1/000000_4_1.npy'
-    drawRectOnSinggleImg(img_path, detect_gt_file, npy_path)
+    # img_path = '/root/autodl-tmp/metric3d/Metric3D/gt_depths/rgb_images/images/train/2024-07-29_074234_000_1/000000_4_1.png'
+    # detect_gt_file = '/root/autodl-tmp/metric3d/Metric3D/gt_depths/rgb_images/images/train/2024-07-29_074234_000_1/000000_4_1.txt'
+    # npy_path = '/root/autodl-tmp/metric3d/Metric3D/test_output/train/2024-07-29_074234_000_1/000000_4_1.npy'
+    # drawRectOnSinggleImg(img_path, detect_gt_file, npy_path)
+
+    npy_path = '/root/autodl-tmp/metric3d/Metric3D/temp/000000_4_1.npy'
+    output_path = '/root/autodl-tmp/metric3d/Metric3D/temp/npy_colored.png'
+    npy2colored_png(npy_path, output_path)

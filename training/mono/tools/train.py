@@ -66,7 +66,7 @@ def parse_args():
                         default=1, 
                         help='number of nodes')
     parser.add_argument(
-        '--launcher', choices=['None', 'pytorch', 'slurm', 'mpi', 'ror'], default='None',
+        '--launcher', choices=['None', 'pytorch', 'slurm', 'mpi', 'ror'], default='slurm',
         help='job launcher') 
     parser.add_argument('--local_rank', 
                         type=int, 
@@ -97,13 +97,7 @@ def set_random_seed(seed, deterministic=False):
 def main(args):
     os.chdir(CODE_SPACE)
     cfg = Config.fromfile(args.config)
-    cfg.dist_params = {
-        'backend': 'nccl',
-        'num_gpus_per_node': 1,
-        'world_size': 1,
-        'rank': 0,
-        'local_rank': 0
-    }
+    print(cfg)
     cfg.dist_params.nnodes = args.nnodes
     cfg.dist_params.node_rank = args.node_rank
     cfg.deterministic = args.deterministic
@@ -137,16 +131,10 @@ def main(args):
     # ckpt path
     if args.load_from is not None:
         cfg.load_from = args.load_from
-    else:
-        cfg.load_from = None
     # resume training
     if args.resume_from is not None:
         cfg.resume_from = args.resume_from
-    else:
-        cfg.resume_from = None
-    # cfg.load_from = args.load_from
-    # cfg.resume_from = args.resume_from
-
+    
     # create work_dir and tensorboard_dir
     os.makedirs(osp.abspath(cfg.work_dir), exist_ok=True)
     os.makedirs(os.path.abspath(cfg.tensorboard_dir), exist_ok=True)
@@ -187,7 +175,8 @@ def main(args):
 
     # log data transfer to canonical space info``
     # log_canonical_transfer_info(cfg)
-    
+    print('>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
+    print(args.launcher )
     # init distributed env first, since logger depends on the dist info.
     if args.launcher == 'None':
         cfg.distributed = False
@@ -265,6 +254,3 @@ if __name__=='__main__':
     args.timestamp = timestamp
     print(args.work_dir, args.tensorboard_dir)
     main(args)
-
-
-

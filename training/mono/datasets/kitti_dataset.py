@@ -28,8 +28,10 @@ class KITTIDataset(BaseDataset):
         #     print(self.data_name)
 
         curr_rgb, curr_depth, curr_normal, curr_sem, curr_cam_model = data_batch['curr_rgb'], data_batch['curr_depth'], data_batch['curr_normal'], data_batch['curr_sem'], data_batch['curr_cam_model']
+        # np.save('merge1.npy', curr_depth)
+        # print(curr_depth.max())
         #curr_stereo_depth = data_batch['curr_stereo_depth']
-        
+
         th = 352 # target size for bottom cropping, a common practice for kitti training
         tw = 1216
 
@@ -42,14 +44,14 @@ class KITTIDataset(BaseDataset):
 
         curr_intrinsic = meta_data['cam_in']
 
-        curr_rgb = curr_rgb[h_start:, w_start:w_end, :]
-        curr_depth = curr_depth[h_start:, w_start:w_end]
+        # curr_rgb = curr_rgb[h_start:, w_start:w_end, :]
+        # curr_depth = curr_depth[h_start:, w_start:w_end]
+        #
+        # curr_normal = curr_normal[h_start:, w_start:w_end, :]
+        # curr_sem = curr_sem[h_start:, w_start:w_end]
 
-        curr_normal = curr_normal[h_start:, w_start:w_end, :]
-        curr_sem = curr_sem[h_start:, w_start:w_end]
-
-        curr_intrinsic[2] = curr_intrinsic[2] - w_start # cw
-        curr_intrinsic[3] = curr_intrinsic[3] - h_start # ch
+        # curr_intrinsic[2] = curr_intrinsic[2] - w_start # cw
+        # curr_intrinsic[3] = curr_intrinsic[3] - h_start # ch
 
         # A patch for stereo depth dataloader (no need to modify specific datasets)
         if 'curr_stereo_depth' in data_batch.keys():
@@ -59,8 +61,15 @@ class KITTIDataset(BaseDataset):
 
 
         # data augmentation
-        transform_paras = dict(random_crop_size = self.random_crop_size) # dict() 
-        # assert curr_rgb.shape[:2] == curr_depth.shape == curr_normal.shape[:2] == curr_sem.shape
+        transform_paras = dict(random_crop_size = self.random_crop_size) # dict()
+
+
+        # curr_depth = cv2.resize(curr_depth, (curr_rgb.shape[1], curr_rgb.shape[0]))
+        # curr_sem = cv2.resize(curr_sem+1, (curr_rgb.shape[1], curr_rgb.shape[0]))
+        # curr_sem=curr_depth
+
+
+        assert curr_rgb.shape[:2] == curr_depth.shape== curr_normal.shape[:2] #== curr_sem.shape
         rgbs, depths, intrinsics, cam_models, normals, other_labels, transform_paras = self.img_transforms(
                                                                    images=[curr_rgb, ], 
                                                                    labels=[curr_depth, ], 
@@ -71,12 +80,17 @@ class KITTIDataset(BaseDataset):
                                                                    transform_paras=transform_paras)
         # process sky masks
         sem_mask = other_labels[0].int()
-        # clip depth map 
+        # clip depth map
+
         depth_out = self.normalize_depth(depths[0])
+        # np.save('merge2.npy', curr_sem)
         # set the depth of sky region to the invalid
         depth_out[sem_mask==142] = -1 # self.depth_normalize[1] - 1e-6
         # get inverse depth
+
         inv_depth = self.depth2invdepth(depth_out, sem_mask==142)
+
+
         filename = os.path.basename(meta_data['rgb'])[:-4] + '.jpg'
         curr_intrinsic_mat = self.intrinsics_list2mat(intrinsics[0])
         cam_models_stacks = [
@@ -115,8 +129,8 @@ class KITTIDataset(BaseDataset):
         ori_curr_intrinsic = meta_data['cam_in']
         curr_rgb, curr_depth = self.load_rgb_depth(curr_rgb_path, curr_depth_path)
         # crop rgb/depth
-        curr_rgb = curr_rgb[:, 43: 1197, :]
-        curr_depth = curr_depth[:, 43: 1197]
+        # curr_rgb = curr_rgb[:, 43: 1197, :]
+        # curr_depth = curr_depth[:, 43: 1197]
         
         ori_h, ori_w, _ = curr_rgb.shape
         # create camera model
@@ -135,7 +149,7 @@ class KITTIDataset(BaseDataset):
                                                                    transform_paras=transform_paras)
         
         # depth in original size and orignial metric***
-        depth_out = self.clip_depth(curr_depth) * self.depth_range[1] # self.clip_depth(depths[0]) #
+        depth_out = self.clip_depth(curr_depth) #self.depth_range[1] # self.clip_depth(depths[0]) #
 
         filename = os.path.basename(meta_data['rgb'])
         curr_intrinsic_mat = self.intrinsics_list2mat(intrinsics[0])
@@ -166,16 +180,18 @@ class KITTIDataset(BaseDataset):
         return data
     
     def process_depth(self, depth, rgb):
-        new_depth = np.zeros_like(depth)
-        H, W = depth.shape
-        crop_h_up = int(0.3324324 * H)
-        crop_h_down = int(0.91351351 * H)
-        crop_w_left = int(0.0359477 * W)
-        crop_w_right = int(0.96405229 * W)
-        
-        new_depth[crop_h_up:crop_h_down, crop_w_left: crop_w_right] = depth[crop_h_up:crop_h_down, crop_w_left: crop_w_right]
-        new_depth[new_depth>65500] = 0
+        # new_depth = np.zeros_like(depth)
+        # H, W = depth.shape
+        # crop_h_up = int(0.3324324 * H)
+        # crop_h_down = int(0.91351351 * H)
+        # crop_w_left = int(0.0359477 * W)
+        # crop_w_right = int(0.96405229 * W)
+        #
+        # new_depth[crop_h_up:crop_h_down, crop_w_left: crop_w_right] = depth[crop_h_up:crop_h_down, crop_w_left: crop_w_right]
+        # new_depth[new_depth>65500] = 0
+        new_depth=depth
         new_depth /= self.metric_scale
+
         #print('image size', new_depth.shape, crop_h_up, crop_h_down, crop_w_left, crop_w_right)
         #self.logger.info('image size, {new_depth.shape}, {crop_h_up}, {crop_h_down}, {crop_w_left}, {crop_w_right}')
         return new_depth

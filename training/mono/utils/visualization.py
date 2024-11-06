@@ -27,8 +27,8 @@ def save_raw_imgs(
 def save_normal_val_imgs(
     iter: int, 
     pred: torch.tensor, 
-    #targ: torch.tensor, 
-    #rgb: torch.tensor, 
+    targ: torch.tensor,
+    rgb: torch.tensor,
     filename: str, 
     save_dir: str, 
     tb_logger=None, 
@@ -39,6 +39,7 @@ def save_normal_val_imgs(
     """
     mean = np.array([123.675, 116.28, 103.53])[np.newaxis, np.newaxis, :]
     std= np.array([58.395, 57.12, 57.375])[np.newaxis, np.newaxis, :]
+    np.save(os.path.join(save_dir, filename[:-4] + '_merge777.npy'), pred.squeeze().cpu().numpy())
     pred = pred.squeeze()
     
     # if pred.size(0) == 3:
@@ -96,6 +97,8 @@ def save_val_imgs(
     # plt.imsave(os.path.join(save_dir, filename[:-4]+'_pred.png'), pred_scale, cmap='rainbow')
     # plt.imsave(os.path.join(save_dir, filename[:-4]+'_gt.png'), target_scale, cmap='rainbow')
     cat_img = np.concatenate([rgb, pred_color, target_color], axis=0)
+    np.save(os.path.join(save_dir, filename[:-4] + '_merge2.npy'), target.squeeze().cpu().numpy())
+    np.save(os.path.join(save_dir, filename[:-4] + '_merge.npy'), pred.squeeze().cpu().numpy())
     plt.imsave(os.path.join(save_dir, filename[:-4]+'_merge.jpg'), cat_img)
 
     # save to tensorboard

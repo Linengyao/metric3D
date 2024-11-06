@@ -26,7 +26,7 @@ from mono.utils.db import load_data_info, reset_ckpt_path
 from mono.model.monodepth_model import get_configured_monodepth_model
 from mono.datasets.distributed_sampler import build_dataset_n_sampler_with_cfg
 from mono.utils.running import load_ckpt
-from mono.utils.do_test import do_test_with_dataloader, do_test_check_data
+from mono.utils.do_test import do_test_with_dataloader
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Train a segmentor')
@@ -151,7 +151,7 @@ def main_worker(local_rank: int, cfg: dict, launcher: str):
         model = torch.nn.DataParallel(model.cuda())
     
     # load ckpt
-    #model, _, _, _ = load_ckpt(cfg.load_from, model, strict_match=False)
+    model, _, _, _ = load_ckpt(cfg.load_from, model, strict_match=False)
     model.eval()
     do_test_with_dataloader(model, cfg, test_dataloader, logger=logger, is_distributed=cfg.distributed)
     # do_test_check_data(model, cfg, test_dataloader, logger=logger, is_distributed=cfg.distributed, local_rank=local_rank)

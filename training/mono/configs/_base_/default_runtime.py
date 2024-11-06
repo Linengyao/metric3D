@@ -7,7 +7,7 @@ log_file = 'out.log'
 load_from = None
 resume_from = None
 
-workflow = [('train', 1)]
+#workflow = [('train', 1)]
 cudnn_benchmark = True
 log_interval = 20
 

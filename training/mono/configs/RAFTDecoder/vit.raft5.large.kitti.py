@@ -1,6 +1,7 @@
 _base_=['../_base_/losses/all_losses.py',
-       '../_base_/models/encoder_decoder/dino_vit_large_reg.dpt_raft.py',
-
+'../_base_/models/encoder_decoder/dino_vit_small_reg.dpt_raft.py',
+        '../_base_/default_runtime.py',
+        '../_base_/schedules/schedule_1m.py',
        '../_base_/datasets/nyu.py',
        '../_base_/datasets/kitti.py'
        ]
@@ -19,8 +20,8 @@ model=dict(
 losses=dict(
     decoder_losses=[
         dict(type='VNLoss', sample_ratio=0.2, loss_weight=0.1),   
-        dict(type='GRUSequenceLoss', loss_weight=1.0, loss_gamma=0.9, stereo_sup=0),
-        dict(type='DeNoConsistencyLoss', loss_weight=0.001, loss_fn='CEL', scale=2)
+        dict(type='GRUSequenceLoss', loss_weight=0, loss_gamma=0.9, stereo_sup=0),
+        dict(type='DeNoConsistencyLoss', loss_weight=0, loss_fn='CEL', scale=2)
     ],
 )
 
@@ -79,8 +80,8 @@ lr_config = dict(policy='poly',
                  power=0.9, min_lr=1e-8, by_epoch=False)
 
 acc_batch = 1
-batchsize_per_gpu = 2
-thread_per_gpu = 2
+batchsize_per_gpu = 1
+thread_per_gpu = 1
 
 KITTI_dataset=dict(
     data = dict(

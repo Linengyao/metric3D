@@ -80,7 +80,8 @@ def get_prediction(
     pred_depth, confidence = output['prediction'], output['confidence']
     pred_depth = torch.abs(pred_depth)
     pred_depth = pred_depth.squeeze()
-
+    print('>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
+    print(normalize_scale, scale_info)
     if flip_aug == True:
         output_flip = model.module.inference(dict(
         input=torch.flip(input, [3]),
@@ -103,7 +104,8 @@ def get_prediction(
 
     pred_depth = pred_depth[pad_info[0]: pred_depth.shape[0]-pad_info[1], pad_info[2]: pred_depth.shape[1]-pad_info[3]]
     pred_depth = torch.nn.functional.interpolate(pred_depth[None, None, :, :], gt_depth.shape, mode='bilinear').squeeze() # to orginal size
-    pred_depth = pred_depth * normalize_scale / scale_info 
+
+    pred_depth = pred_depth * normalize_scale / scale_info
 
     if clip_range != None:
         pred_depth = torch.clamp(pred_depth, clip_range[0], clip_range[1])

@@ -138,8 +138,10 @@ class BaseDataset(Dataset):
         canonical = self.data_basic.pop('canonical_space')
         self.data_basic.update(canonical)
         self.disp_scale = 10.0
+        print('>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
+        print(kwargs)
         self.depth_range = kwargs['depth_range'] # predefined depth range for the network
-        self.clip_depth_range = kwargs['clip_depth_range'] # predefined depth range for data processing
+        self.clip_depth_range = (0.1,200)#kwargs['clip_depth_range'] # predefined depth range for data processing
         self.depth_normalize = kwargs['depth_normalize']
         
         self.img_transforms = img_transform.Compose(self.build_data_transforms())
@@ -384,6 +386,7 @@ class BaseDataset(Dataset):
         curr_intrinsic = meta_data['cam_in']
         # load rgb/depth
         curr_rgb, curr_depth = self.load_rgb_depth(data_path['rgb_path'], data_path['depth_path'])
+
         # get semantic labels
         curr_sem = self.load_sem_label(data_path['sem_path'], curr_depth)
         # create camera model
@@ -408,12 +411,13 @@ class BaseDataset(Dataset):
 
 
     def clip_depth(self, depth: np.array) -> np.array:
-        depth[(depth>self.clip_depth_range[1]) | (depth<self.clip_depth_range[0])] = -1
+        # depth[(depth>self.clip_depth_range[1]) | (depth<self.clip_depth_range[0])] = -1
         depth /= self.depth_range[1]
-        depth[depth<self.EPS] = -1
+        # depth[depth<self.EPS] = -1
         return depth
     
     def normalize_depth(self, depth: np.array) -> np.array:
+
         depth /= self.depth_range[1]
         depth[depth<self.EPS] = -1
         return depth
@@ -518,6 +522,7 @@ class BaseDataset(Dataset):
             self.logger.info(f'>>>>{rgb_path} has errors.')
        
         depth = self.load_data(depth_path)
+
         if depth is None:
             self.logger.info(f'{depth_path} has errors.')
         
@@ -526,11 +531,13 @@ class BaseDataset(Dataset):
         #     depth_path=depth,
         # ))
         depth = depth.astype(np.float)
+
         # if depth.shape != rgb.shape[:2]:
         #     print(f'no-equal in {self.data_name}')
         #     depth = cv2.resize(depth, rgb.shape[::-1][1:])
         
         depth  = self.process_depth(depth, rgb)
+
         return rgb, depth
     
     def load_sem_label(self, sem_path, depth=None, sky_id=142) -> np.array:

@@ -312,10 +312,20 @@ def process_images(input_dir, output_dir, model, camera_suffix):
                     print(f"Postprocessing time: {end_time - start_time:.4f} seconds")
 
 if __name__ == '__main__':
-    cfg_file = '/root/autodl-tmp/metric3d/Metric3D/training/mono/configs/RAFTDecoder/vit.raft5.small.kitti.py'
-    ckpt_file = '/root/autodl-tmp/metric3d/Metric3D/metric_depth_vit_small_800k.pth'
-    input_dir = '/root/autodl-tmp/metric3d/Metric3D/gt_depths/rgb_images/images'
-    output_dir = '/root/autodl-tmp/metric3d/Metric3D/test_output'
-    camera_suffix = '_1.png'  # 选择左相机
+    # cfg_file = '/root/autodl-tmp/metric3d/Metric3D/training/mono/configs/RAFTDecoder/vit.raft5.small.kitti.py'
+    # ckpt_file = '/root/autodl-tmp/metric3d/Metric3D/metric_depth_vit_small_800k.pth'
+    # input_dir = '/root/autodl-tmp/metric3d/Metric3D/gt_depths/rgb_images/images'
+    # output_dir = '/root/autodl-tmp/metric3d/Metric3D/test_output'
+    # camera_suffix = '_1.png'  # 选择左相机
+    # model = load_model(cfg_file, ckpt_file)
+    # process_images(input_dir, output_dir, model, camera_suffix)
+
+
+    cfg_file = '/root/autodl-tmp/metric3d/Metric3D/training/mono/configs/RAFTDecoder/vit.raft5.large.kitti.py'
+    ckpt_file = '/root/autodl-tmp/metric3d/Metric3D/training/work_dirs/vit.raft5.large.kitti/20241105_200723/ckpt/step00020000.pth'
+    # ckpt_file = '/root/autodl-tmp/metric3d/Metric3D/metric_depth_vit_small_800k.pth'
+    rgb_file = '/root/autodl-tmp/metric3d/Metric3D/gt_depths/rgb_images/images/train/2024-07-29_074234_000_1/000000_4_1.png'
+    output_file_path = '/root/autodl-tmp/metric3d/Metric3D/temp/000000_4_1.npy'
     model = load_model(cfg_file, ckpt_file)
-    process_images(input_dir, output_dir, model, camera_suffix)
+    pred_depth = test_simple_trained(rgb_file,model)
+    np.save(output_file_path, pred_depth.cpu().numpy())
