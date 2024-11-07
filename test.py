@@ -146,6 +146,7 @@
 #     test_simple_trained(rgb_file, model_path, npy_save_path)
 
 # 2024/11/5
+import json
 import os
 import cv2
 import torch
@@ -227,7 +228,8 @@ def test_simple_trained(rgb_file, model):
     rgb_origin = cv2.imread(rgb_file)[:, :, ::-1]
 
     #### ajust input size to fit pretrained model
-    input_size = (544, 1216) # for convnext model
+    # input_size = (616, 1064) # for vit model
+    input_size = (308, 532)
     h, w = rgb_origin.shape[:2]
     scale = min(input_size[0] / h, input_size[1] / w)
     rgb = cv2.resize(rgb_origin, (int(w * scale), int(h * scale)), interpolation=cv2.INTER_LINEAR)
@@ -270,7 +272,7 @@ def test_simple_trained(rgb_file, model):
     end_time = time.time()
     inference_time = end_time - start_time
     print(f"Inference time: {inference_time:.4f} seconds")
-    return pred_depth
+    return pred_depth, inference_time
 
 def load_model(cfg_file, ckpt_file):
     cfg = Config.fromfile(cfg_file)
@@ -282,6 +284,8 @@ def process_images(input_dir, output_dir, model, camera_suffix):
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
+    results = []
+
     for root, dirs, files in os.walk(input_dir):
         for dir_name in dirs:
             video_dir = os.path.join(root, dir_name)
@@ -291,41 +295,73 @@ def process_images(input_dir, output_dir, model, camera_suffix):
 
             # 重置后处理参数
             postprocess_param_init()
+            # 获取文件列表并排序
+            files = sorted(os.listdir(video_dir))
 
-            for file in sorted(os.listdir(video_dir)):
-                if file.lower().endswith(('.png', '.jpg', '.jpeg')) and file.endswith(camera_suffix):
-                    input_file_path = os.path.join(video_dir, file)
-                    output_file_path = os.path.join(output_subdir, os.path.splitext(file)[0] + '.npy')
-                    label_file_path = os.path.join(video_dir, os.path.splitext(file)[0] + '.txt')
+            # 过滤出符合条件的文件
+            filtered_files = [file for file in files if file.lower().endswith(('.png', '.jpg', '.jpeg')) and file.endswith(camera_suffix)]
 
-                    pred_depth = test_simple_trained(input_file_path, model)
-                    # np.save(output_file_path, pred_depth.cpu().numpy())
+            for i, file in enumerate(filtered_files):
+                input_file_path = os.path.join(video_dir, file)
+                output_file_path = os.path.join(output_subdir, os.path.splitext(file)[0] + '.npy')
+                label_file_path = os.path.join(video_dir, os.path.splitext(file)[0] + '.txt')
 
-                    # 进行后处理
-                    # 加载YOLO标签文件
-                    image_shape = cv2.imread(input_file_path).shape[:2]
-                    det = load_yolo_labels(label_file_path, image_shape)
-                    
-                    start_time = time.time()
-                    postprocess(det, pred_depth.cpu().numpy())
-                    end_time = time.time()
-                    print(f"Postprocessing time: {end_time - start_time:.4f} seconds")
+                pred_depth, inference_time = test_simple_trained(input_file_path, model)
+                np.save(output_file_path, pred_depth.cpu().numpy())
+
+                # 进行后处理
+                # 加载YOLO标签文件
+                image_shape = cv2.imread(input_file_path).shape[:2]
+                det = load_yolo_labels(label_file_path, image_shape)
+                
+                start_time = time.time()
+                postprocess(det, pred_depth.cpu().numpy())
+                end_time = time.time()
+                postprocess_time = end_time - start_time
+                total_time = inference_time + postprocess_time
+
+                # 生成唯一标识符
+                unique_identifier = os.path.relpath(input_file_path, input_dir)
+
+                # 记录结果
+                result = {
+                    "image_name": file,
+                    "unique_identifier": unique_identifier,
+                    "frame_number": i + 1,
+                    "inference_time": inference_time,
+                    "postprocess_time": postprocess_time,
+                    "total_time": total_time
+                }
+                results.append(result)
+
+                print(f"Processing file {i+1}: {file}")
+                print(f"Inference time: {inference_time:.4f} seconds")
+                print(f"Postprocessing time: {postprocess_time:.4f} seconds")
+                print(f"Total time: {total_time:.4f} seconds")
+
+    # 保存结果到JSON文件
+    result_save(results, output_dir)
+def result_save(results, output_dir):
+    result_file_path = os.path.join(output_dir, 'results.json')
+    with open(result_file_path, 'w') as f:
+        json.dump(results, f, indent=4)
 
 if __name__ == '__main__':
-    # cfg_file = '/root/autodl-tmp/metric3d/Metric3D/training/mono/configs/RAFTDecoder/vit.raft5.small.kitti.py'
-    # ckpt_file = '/root/autodl-tmp/metric3d/Metric3D/metric_depth_vit_small_800k.pth'
-    # input_dir = '/root/autodl-tmp/metric3d/Metric3D/gt_depths/rgb_images/images'
-    # output_dir = '/root/autodl-tmp/metric3d/Metric3D/test_output'
-    # camera_suffix = '_1.png'  # 选择左相机
-    # model = load_model(cfg_file, ckpt_file)
-    # process_images(input_dir, output_dir, model, camera_suffix)
-
-
     cfg_file = '/root/autodl-tmp/metric3d/Metric3D/training/mono/configs/RAFTDecoder/vit.raft5.large.kitti.py'
-    ckpt_file = '/root/autodl-tmp/metric3d/Metric3D/training/work_dirs/vit.raft5.large.kitti/20241105_200723/ckpt/step00020000.pth'
-    # ckpt_file = '/root/autodl-tmp/metric3d/Metric3D/metric_depth_vit_small_800k.pth'
-    rgb_file = '/root/autodl-tmp/metric3d/Metric3D/gt_depths/rgb_images/images/train/2024-07-29_074234_000_1/000000_4_1.png'
-    output_file_path = '/root/autodl-tmp/metric3d/Metric3D/temp/000000_4_1.npy'
+    
+    # 这个模型是的输入是308*512的，是在预训练模型上微调的
+    ckpt_file = '/root/autodl-tmp/metric3d/Metric3D/step00020000.pth' 
+    input_dir = '/root/autodl-tmp/metric3d/Metric3D/gt_depths/rgb_images/images'
+    output_dir = '/root/autodl-tmp/metric3d/Metric3D/test_output/my_small_vit_pth_result'
+    camera_suffix = '_1.png'  # 选择左相机
     model = load_model(cfg_file, ckpt_file)
-    pred_depth = test_simple_trained(rgb_file,model)
-    np.save(output_file_path, pred_depth.cpu().numpy())
+    process_images(input_dir, output_dir, model, camera_suffix)
+
+
+    # cfg_file = '/root/autodl-tmp/metric3d/Metric3D/training/mono/configs/RAFTDecoder/vit.raft5.large.kitti.py'
+    # ckpt_file = '/root/autodl-tmp/metric3d/Metric3D/training/work_dirs/vit.raft5.large.kitti/20241105_200723/ckpt/step00020000.pth'
+    # rgb_file = '/root/autodl-tmp/metric3d/Metric3D/gt_depths/rgb_images/images/train/2024-07-29_074234_000_1/000000_4_1.png'
+    # output_file_path = '/root/autodl-tmp/metric3d/Metric3D/temp/000000_4_1.npy'
+    # model = load_model(cfg_file, ckpt_file)
+    # pred_depth = test_simple_trained(rgb_file,model)
+    # np.save(output_file_path, pred_depth.cpu().numpy())

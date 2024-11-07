@@ -177,13 +177,59 @@ def npy2colored_png(npy_path, output_path, colormap='viridis'):
     # 保存为 PNG 文件
     image.save(output_path)
 
+def test():
+    x, y, w, h = (597, 400, 147, 141)
+    npy_path = '/root/autodl-tmp/metric3d/Metric3D/test_output/my_small_vit_pth_result/train/2024-07-29_074234_000_2/000000_5_1.npy'
+    output_path = '/root/autodl-tmp/metric3d/Metric3D/test_output/my_small_vit_pth_result/test.png'
+    data = np.load(npy_path)
+    
+    # 提取检测框区域的深度图
+    depth_roi = data[y:y + h, x:x + w]
+    
+    # 确保深度图的最大值不为零，以免除零错误
+    depth_max = np.max(depth_roi)
+    if depth_max == 0:
+        return {'depth': None, 'contour_points': None, 'centroid': None}  # 深度图无有效值，返回None
+    
+    # 使用边缘检测算法找到轮廓
+    edges = cv2.Canny((depth_roi * 255 / depth_max).astype(np.uint8), 10, 20)
+    # 确保轮廓包括四周的边界
+    edges[0, :] = 255  # 上边界
+    edges[-1, :] = 255  # 下边界
+    edges[:, 0] = 255  # 左边界
+    edges[:, -1] = 255  # 右边界
+
+    # 进行形态学闭运算，以连接不连续的区域并去除小的孔洞
+    kernel = np.ones((5, 5), np.uint8)  # 可以根据需要调整核大小
+    closed_edges = cv2.morphologyEx(edges, cv2.MORPH_CLOSE, kernel, iterations=2)  # 增加迭代次数
+
+    # 找到闭运算后的轮廓
+    contours, _ = cv2.findContours(closed_edges, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
+
+   # 计算每个轮廓的面积
+    contour_areas = [cv2.contourArea(contour) for contour in contours]
+    
+    # 排序轮廓面积，找到第二大的轮廓
+    if len(contour_areas) < 2:
+        return {'depth': None, 'contour_points': None, 'centroid': None}  # 轮廓不足两个，返回None
+    
+    sorted_contours = sorted(zip(contours, contour_areas), key=lambda x: x[1], reverse=True)
+    second_largest_contour = sorted_contours[1][0]
+    
+    # 创建一个空白图像用于绘制轮廓
+    contour_image = np.zeros_like(depth_roi, dtype=np.uint8)
+    cv2.drawContours(contour_image, [second_largest_contour], -1, (255, 255, 255), thickness=1)
+    
+    # 保存处理后的图像
+    cv2.imwrite(output_path, contour_image)
+
 
 if __name__ == '__main__':
     # npy_path = '/root/autodl-tmp/metric3d/Metric3D/temp/000000_4_1.npy'
     # parseSingleNpy(npy_path)
 
-    # npy_path = '/root/autodl-tmp/metric3d/Metric3D/gt_depths/depth_npy/train/2024-07-29_074234_000_1/000000_4_1.npy'
-    # output_path = '/root/autodl-tmp/metric3d/Metric3D/gt_depths/depth_images/000000_4_1.png'
+    # npy_path = '/root/autodl-tmp/metric3d/Metric3D/test_output/small_vit_pth_result/train/2024-07-29_074234_000_2/000000_5_1.npy'
+    # output_path = '/root/autodl-tmp/metric3d/Metric3D/test_output/small_vit_pth_result/000000_5_1_depth.png'
     # npy2pngSingle(npy_path, output_path)
 
     # src_dir = '/root/autodl-tmp/metric3d/Metric3D/gt_depths/depth_npy'
@@ -206,6 +252,24 @@ if __name__ == '__main__':
     # npy_path = '/root/autodl-tmp/metric3d/Metric3D/test_output/train/2024-07-29_074234_000_1/000000_4_1.npy'
     # drawRectOnSinggleImg(img_path, detect_gt_file, npy_path)
 
-    npy_path = '/root/autodl-tmp/metric3d/Metric3D/temp/000000_4_1.npy'
-    output_path = '/root/autodl-tmp/metric3d/Metric3D/temp/npy_colored.png'
-    npy2colored_png(npy_path, output_path)
+    # npy_path = '/root/autodl-tmp/metric3d/Metric3D/test_output/my_small_vit_pth_result/train/2024-07-29_074234_000_2/000000_5_1.npy'
+    # output_path = '/root/autodl-tmp/metric3d/Metric3D/test_output/my_small_vit_pth_result/000000_5_1_depth.png'
+    # npy2colored_png(npy_path, output_path)
+    
+    # 测试中间轮廓提取部分
+    # test()
+
+    img_path='/root/autodl-tmp/metric3d/Metric3D/test_output/small_vit_pth_result/000000_5_1_depth.png'
+    output_path = '/root/autodl-tmp/metric3d/Metric3D/test_output/small_vit_pth_result/000000_5_1_depth_roi.png'
+    x, y, w, h = (597, 400, 147, 141)
+    # 读取图像
+    img = cv2.imread(img_path)
+
+    # 在指定区域画矩形框
+    cv2.rectangle(img, (x, y), (x + w, y + h), (0, 255, 0), 2)
+
+    # 保存处理后的图像
+    cv2.imwrite(output_path, img)
+
+
+

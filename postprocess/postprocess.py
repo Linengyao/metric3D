@@ -7,7 +7,20 @@ import matplotlib.pyplot as plt
 from scipy.optimize import linear_sum_assignment
 from tqdm import tqdm
 from scipy.ndimage import zoom  # 导入缩放库
-from postprocess.kf import *  
+# from postprocess.kf import *  
+from kf import *
+import json
+
+class NumpyEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, np.float32):
+            return float(obj)
+        elif isinstance(obj, np.ndarray):
+            return obj.tolist()
+        elif isinstance(obj, np.integer):
+            return int(obj)
+        return super(NumpyEncoder, self).default(obj)
+
 def load_images_and_depths(image_dir, depth_dir, camera_suffix, image_extensions=('jpg', 'png')):
     """
     加载图像和深度图
@@ -34,7 +47,9 @@ def load_images_and_depths(image_dir, depth_dir, camera_suffix, image_extensions
                 image = cv2.imread(image_path)
                 depth = np.load(depth_path)
                 depth = np.squeeze(depth)
-                depth = zoom(depth, (720 / 616, 1280 / 1064), order=1)
+                # 检查 depth 的形状是否为 (616, 1064)
+                if depth.shape == (616, 1064):
+                    depth = zoom(depth, (720 / 616, 1280 / 1064), order=1)
                 images.append(image)
                 depths.append(depth)
                 labels.append(label_path)
@@ -164,7 +179,163 @@ def calculate_distance(depth_map, target_bbox):
         return depth_map[center_y, center_x]
     else:
         return None
+    
 
+# def choseDepthOutput(det, preds_depth):
+#     """
+#     从检测框内选取出合适的深度值
+#     :param det: 目标检测框，格式为 (x, y, w, h)
+#     :param preds_depth: 深度图
+#     :return: 检测框内（目标）所对应的深度值
+#     """
+    
+#     x, y, w, h = det
+
+#     # 提取检测框区域的深度图
+#     depth_roi = preds_depth[y:y + h, x:x + w]
+
+#     # 确保深度图的最大值不为零，以免除零错误
+#     depth_max = np.max(depth_roi)
+#     if depth_max == 0:
+#         return None  # 深度图无有效值，返回None
+
+#     # 使用边缘检测算法找到轮廓
+#     edges = cv2.Canny((depth_roi * 255 / depth_max).astype(np.uint8), 50, 150)
+#     contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+#     if contours:
+#         # 寻找最大的轮廓区域
+#         largest_contour = max(contours, key=cv2.contourArea)
+#         mask = np.zeros_like(depth_roi, dtype=np.uint8)
+#         cv2.drawContours(mask, [largest_contour], -1, color=1, thickness=-1)
+
+#         # 获取轮廓内的深度值并过滤无效（零）深度值
+#         depth_values = depth_roi[mask == 1]
+#         depth_values = depth_values[depth_values > 0]  # 过滤掉零值
+#         if len(depth_values) > 0:
+#             # 计算轮廓区域的深度值，可以选择平均值或质心位置的深度
+#             mean_depth = np.mean(depth_values)  # 平均深度
+#             M = cv2.moments(largest_contour)
+#             if M["m00"] != 0:
+#                 # 质心坐标
+#                 cx = int(M["m10"] / M["m00"])
+#                 cy = int(M["m01"] / M["m00"])
+#                 # 确保质心坐标在有效范围内
+#                 if 0 <= cy < depth_roi.shape[0] and 0 <= cx < depth_roi.shape[1]:
+#                     centroid_depth = depth_roi[cy, cx]
+#                 else:
+#                     centroid_depth = mean_depth
+#             else:
+#                 centroid_depth = mean_depth
+            
+#             # 选择使用质心深度或平均深度
+#             return centroid_depth
+#         else:
+#             # 如果没有有效深度值，则返回None或默认值
+#             return None
+#     else:
+#         # 如果没有找到轮廓，则使用整个检测框的平均深度，过滤零值
+#         depth_values = depth_roi[depth_roi > 0]
+#         return np.mean(depth_values) if len(depth_values) > 0 else None
+
+def choseDepthOutputWithProcess(det, preds_depth):
+    """
+    从检测框内选取出合适的深度值，并返回用于可视化的额外信息
+    :param det: 目标检测框，格式为 (x, y, w, h)
+    :param preds_depth: 深度图
+    :return: 包含检测框内（目标）所对应的深度值和其他用于可视化的信息的字典
+    """
+    
+    x, y, w, h = det
+
+    # 提取检测框区域的深度图
+    depth_roi = preds_depth[y:y + h, x:x + w]
+
+    # 确保深度图的最大值不为零，以免除零错误
+    depth_max = np.max(depth_roi)
+    if depth_max == 0:
+        return {'depth': None, 'contour_points': None, 'centroid': None}  # 深度图无有效值，返回None
+
+    # 使用边缘检测算法找到轮廓
+    edges = cv2.Canny((depth_roi * 255 / depth_max).astype(np.uint8), 10, 20)
+    # 确保轮廓包括四周的边界
+    edges[0, :] = 255  # 上边界
+    edges[-1, :] = 255  # 下边界
+    edges[:, 0] = 255  # 左边界
+    edges[:, -1] = 255  # 右边界
+
+    # 进行形态学闭运算，以连接不连续的区域并去除小的孔洞
+    kernel = np.ones((5, 5), np.uint8)  # 可以根据需要调整核大小
+    closed_edges = cv2.morphologyEx(edges, cv2.MORPH_CLOSE, kernel, iterations=2)
+
+    # 找到闭运算后的轮廓
+    contours, _ = cv2.findContours(closed_edges, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
+    
+    contour_points = []  # 用于保存轮廓点的集合
+
+    if contours:
+        if len(contours) >= 2:
+            # 对轮廓按面积大小降序排序
+            contours = sorted(contours, key=cv2.contourArea, reverse=True)
+            largest_contour = contours[1]
+            mask = np.zeros_like(depth_roi, dtype=np.uint8)
+            cv2.drawContours(mask, [largest_contour], -1, color=1, thickness=-1)
+
+            # 提取最大轮廓的所有点，并加上检测框的偏移量
+            for point in largest_contour:
+                contour_points.append((point[0][0] + x, point[0][1] + y)) 
+
+            # 获取轮廓内的深度值并过滤无效（零）深度值
+            depth_values = depth_roi[mask == 1]
+            depth_values = depth_values[depth_values > 0]  # 过滤掉零值
+            if len(depth_values) > 0:
+                # 计算轮廓区域的深度值，可以选择平均值或质心位置的深度
+                mean_depth = np.mean(depth_values)  # 平均深度
+                M = cv2.moments(largest_contour)
+                if M["m00"] != 0:
+                    # 质心坐标
+                    cx = int(M["m10"] / M["m00"]) + x
+                    cy = int(M["m01"] / M["m00"]) + y
+                    # 确保质心坐标在有效范围内
+                    if 0 <= cy < preds_depth.shape[0] and 0 <= cx < preds_depth.shape[1]:
+                        centroid_depth = preds_depth[cy, cx]
+                    else:
+                        centroid_depth = mean_depth
+                else:
+                    centroid_depth = mean_depth
+                
+                # 选择使用质心深度或平均深度
+                return {
+                    'depth': centroid_depth,
+                    'contour_points': contour_points,
+                    'centroid': (cx, cy)
+                }
+            else:
+                # 如果没有有效深度值，则返回None或默认值
+                return {'depth': None, 'contour_points': contour_points, 'centroid': None}
+        else:
+            # 如果没有找到至少两个轮廓，则使用中心点方式输出深度值
+            cx = x + w // 2
+            cy = y + h // 2
+            if 0 <= cy < preds_depth.shape[0] and 0 <= cx < preds_depth.shape[1]:
+                centroid_depth = preds_depth[cy, cx]
+            else:
+                centroid_depth = None
+            return {'depth': centroid_depth, 'contour_points': contour_points, 'centroid': (cx, cy)}
+    else:
+        # 如果没有找到轮廓，则使用整个检测框的中心点方式输出深度值
+        cx = x + w // 2
+        cy = y + h // 2
+        if 0 <= cy < preds_depth.shape[0] and 0 <= cx < preds_depth.shape[1]:
+            centroid_depth = preds_depth[cy, cx]
+        else:
+            centroid_depth = None
+        return {'depth': centroid_depth, 'contour_points': contour_points, 'centroid': (cx, cy)}
+
+
+
+
+    
 def plot_distances(distances, target_ids, output_dir, min_frames=50):
     """
     绘制目标距离随时间变化的曲线图并保存为图片文件
@@ -329,6 +500,10 @@ def process_video(image_dir, depth_dir, label_dir, camera_suffix, output_dir):
     prev_bboxes = []
     next_id = 0
     kalman_filters={}
+    frame_data = []
+    video_data={}
+
+
     # 
     for i, (image, depth, label_path) in enumerate(tqdm(zip(images, depths, labels), total=len(images), desc="Processing frames")):
         if os.path.exists(label_path):
@@ -342,13 +517,26 @@ def process_video(image_dir, depth_dir, label_dir, camera_suffix, output_dir):
                     kalman_filters[bbox['id']] = DepthKalmanFilter()
             else:
                 curr_bboxes, next_id = assign_ids(prev_bboxes, curr_bboxes, next_id)
-                
+
+            frame_info = {
+                "frame": f"{'/'.join(label_path.split('/')[-4:]).replace('txt', 'png')}",
+                "frame_id": i,
+                "bboxes": [],
+            }             
             for bbox in curr_bboxes:
                 if bbox['id'] not in distances:
                     distances[bbox['id']] = []
                     filter_distances[bbox['id']] = []
 
-                distance = calculate_distance(depth, bbox['bbox'])
+                # 选取检测框中心点作为输出深度值
+                # distance = calculate_distance(depth, bbox['bbox'])
+                # distance = distance * 2.5 if distance is not None else None
+                    
+                # chose_dict存储了在检测框中选取深度值的一些结果，方便后面使用其可视化
+                chose_dict = choseDepthOutputWithProcess(bbox['bbox'], depth) 
+                distance = chose_dict['depth']  
+                # distance = distance * 3 if distance is not None else None
+
                 distances[bbox['id']].append((i, distance))  # 记录帧号和距离值为元组
 
                 if distance is not None:
@@ -362,16 +550,33 @@ def process_video(image_dir, depth_dir, label_dir, camera_suffix, output_dir):
                     filter_distances[bbox['id']].append((i, filtered_distance))
                 else:
                     filter_distances[bbox['id']].append((i, None))
+                frame_info["bboxes"].append({
+                    "bbox": bbox['bbox'],
+                    "chose_dict": chose_dict 
+                })
+            frame_data.append(frame_info)          
+
             prev_bboxes = curr_bboxes
         else:
             for target_id in distances:
                 distances[target_id].append((i, None))  # 没有检测到目标时记录None
                 filter_distances[target_id].append((i, None))  # 没有检测到目标时记录None
-    
+        video_data = {
+            "video": os.path.basename(image_dir),
+            "distances": distances,
+            "filter_distances": filter_distances,
+        }
+        # 将所有数据保存为JSON文件
+        output_file = os.path.join(output_dir, f"{os.path.basename(image_dir)}.json")
+        with open(output_file, 'w', encoding='utf-8') as f:
+            json.dump({"frame_data": frame_data, "video_data": video_data}, f, ensure_ascii=False, indent=4, cls=NumpyEncoder)     
 
     # plot_distances_with_filter(distances, filter_distances, list(distances.keys()), output_dir, min_frames=90)
     # plot_distances_with_range(distances, filter_distances, list(distances.keys()), output_dir, min_frames=90)
-    plot_distances_with_rate(distances, filter_distances, list(distances.keys()), output_dir, min_frames=90)
+    # plot_distances_with_rate(distances, filter_distances, list(distances.keys()), output_dir, min_frames=90)
+
+
+
 
 
 def parse_npy(npy_path):
@@ -387,11 +592,12 @@ if __name__ == '__main__':
 
     # 示例调用
     image_dir = '/root/autodl-tmp/metric3d/Metric3D/gt_depths/rgb_images/images/train/2024-07-29_074234_000_2'
-    depth_dir = '/root/autodl-tmp/metric3d/Metric3D/test_output/train/2024-07-29_074234_000_2'
+    depth_dir = '/root/autodl-tmp/metric3d/Metric3D/test_output/my_small_vit_pth_result/train/2024-07-29_074234_000_2'
     label_dir = '/root/autodl-tmp/metric3d/Metric3D/gt_depths/rgb_images/images/train/2024-07-29_074234_000_2'
     camera_suffix = '1'  # 选择左相机
-    output_dir = '/root/autodl-tmp/metric3d/Metric3D/temp'
+    output_dir = '/root/autodl-tmp/metric3d/Metric3D/test_output/my_small_vit_pth_result'
 
     process_video(image_dir, depth_dir, label_dir, camera_suffix, output_dir)
+
 
 
